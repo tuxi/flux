@@ -1,0 +1,209 @@
+server:
+  port: 12210
+  mode: "debug"
+  language: "zh"
+
+log:
+  level: "debug"
+  format: "json"
+  addsource: true
+
+database:
+  host: "127.0.0.1"
+  port: 5432
+  user: "postgres"
+  password: "replace-with-your-postgres-password"
+  dbname: "flux"
+  sslmode: "disable"
+
+redis:
+  host: "127.0.0.1"
+  port: 6379
+  password: ""
+  db: 0
+  poolsize: 10
+  minidleconns: 1
+  idletimeout: 3000
+
+auth:
+  jwtsecret: "replace-with-a-long-random-jwt-secret"
+  ttl: 432000
+  blacklistperiod: 10
+
+deepseek:
+  apikey: "replace-with-your-deepseek-api-key-or-leave-empty"
+  baseurl: "https://api.deepseek.com/v1"
+
+openai:
+  apikey: "replace-with-your-openai-api-key-or-leave-empty"
+  baseurl: "https://api.openai.com/v1"
+
+qwen:
+  apikey: "replace-with-your-qwen-api-key-or-leave-empty"
+  baseurl: "https://dashscope.aliyuncs.com/compatible-mode/v1"
+
+alioss:
+  accesskeyid: "replace-with-your-aliyun-oss-access-key-id"
+  accesskeysecret: "replace-with-your-aliyun-oss-access-key-secret"
+  endpoint: "oss-cn-beijing.aliyuncs.com"
+  bucketregion: "oss-cn-beijing"
+  bucketname: "replace-with-your-oss-bucket-name"
+  accessmode: "public" # public 当前公开 bucket；private 私有 bucket，provider_access 自动生成短签 URL
+  signed_url_expire_seconds: 1800
+  provider_url_expire_seconds: 7200
+  user_upload_retention_days_free: 30
+  user_upload_retention_days_member: 180
+  cleanup_enabled: true
+  cleanup_interval_seconds: 3600
+  cleanup_batch_size: 100
+  provider_access_retention_hours: 24
+  task_intermediate_retention_hours: 24
+  cache_retention_hours: 168
+  audit_retention_hours: 720
+  delete_retry_max: 5
+  delete_retry_delay_seconds: 1800
+
+alists:
+  accesskeyid: "replace-with-your-aliyun-sts-access-key-id"
+  accesskeysecret: "replace-with-your-aliyun-sts-access-key-secret"
+  endpoint: "oss-cn-beijing.aliyuncs.com"
+  bucketregion: "oss-cn-beijing"
+  bucketname: "replace-with-your-oss-bucket-name"
+  regionid: "cn-beijing"
+  rolearn: "replace-with-your-ram-role-arn"
+
+aliyunauth:
+  regionid: ""
+  accesskeyid: ""
+  accesssecret: ""
+  signname: ""
+  templatecode: ""
+  schemename: ""
+  codelength: 6
+  valid_time_sec: 300
+  interval_sec: 60
+
+appleauth:
+  teamid: ""
+  clientid: "" # 通常是你的 app bundle id，例如 com.objc.dreamlog
+  keyid: ""
+  privatekey: |
+    -----BEGIN PRIVATE KEY-----
+    replace-with-your-apple-auth-private-key
+    -----END PRIVATE KEY-----
+
+volcengine:
+  apikey: "replace-with-your-volcengine-api-key"
+  endpoint: "https://ark.cn-beijing.volces.com"
+
+keling:
+  accesskey: "replace-with-your-keling-access-key"
+  secretkey: "replace-with-your-keling-secret-key"
+  endpoint: "https://api-beijing.klingai.com"
+
+appstore:
+  issuerid: ""
+  keyid: ""
+  bundleid: ""
+  privatekey: |
+    -----BEGIN PRIVATE KEY-----
+    replace-with-your-app-store-private-key
+    -----END PRIVATE KEY-----
+  environment: "sandbox"
+  rootcertpem: |
+    -----BEGIN CERTIFICATE-----
+    replace-with-apple-root-g3-certificate-or-copy-from-deploy/apple_root_g3.pem
+    -----END CERTIFICATE-----
+  enable_sandbox_fallback: true
+
+tts:
+  enabled: true
+  edge:
+    service_url: "http://tts-service:8088"   # 生产环境使用，本地环境使用127.0.0.1:8088
+    submit_timeout_ms: 1000
+    wait_timeout_ms: 90000
+    poll_interval_ms: 1000
+    command: "edge-tts" # 本地开发用，上线后使用service_url，调用独立容器中的服务
+  volcengine:
+    appid: "replace-with-your-volcengine-tts-appid"
+    accesstoken: "replace-with-your-volcengine-tts-access-token"
+    secretkey: ""
+    voicetype: "BV104_streaming"
+    resourceid: "volc.tts_async.default"
+    submiturl: "https://openspeech.bytedance.com/api/v1/tts_async/submit"
+    queryurl: "https://openspeech.bytedance.com/api/v1/tts_async/query"
+    audioformat: "mp3"
+    samplerate: 24000
+    enable_subtitle: 1
+    price_per_10k_chars: 3.0
+    submit_timeout_ms: 15000
+    wait_timeout_ms: 90000
+    poll_interval_ms: 2000
+  doubao:
+    appid: "replace-with-your-doubao-tts-appid"
+    accesskey: "replace-with-your-doubao-tts-access-key"
+    speaker: "zh_female_vv_uranus_bigtts"
+    resourceid: "seed-tts-2.0"
+    submiturl: "https://openspeech.bytedance.com/api/v3/tts/submit"
+    queryurl: "https://openspeech.bytedance.com/api/v3/tts/query"
+    audioformat: "mp3"
+    samplerate: 24000
+    price_per_10k_chars: 8.0
+    timeout_ms: 60000
+    wait_timeout_ms: 120000
+    poll_interval_ms: 2000
+ffmpeg:
+  service_url: "http://ffmpeg-service:8089" # 线上环境环境，本地非docker环境使用127.0.0.1:8089
+  submit_timeout_ms: 1000
+  probe_timeout_ms: 30000
+  wait_timeout_ms: 300000
+  poll_interval_ms: 2000
+
+# dream-ai-tools OCR / ASR 服务（video_to_prompt 使用）。
+# 留空则 OCR/ASR 工具返回空结果 + warning，不阻断工作流。
+video_tools:
+  ocr_service_url: "http://127.0.0.1:8091"   # 单帧同步接口 /v1/ocr/keyframe；OCR 由 map_extract_ocr 逐帧并发
+  asr_service_url: "http://127.0.0.1:8092"
+  ocr_timeout_ms: 180000   # 单帧 OCR 请求超时
+  asr_timeout_ms: 180000
+
+anonymous_cleanup:
+  enabled: false           # 默认禁用，确认安全后再开
+  retention_days: 90       # 距匿名注册超过 N 天且无资产的账号将被硬删
+  interval_hours: 24       # 跑批间隔
+  batch_size: 200          # 单批最多扫描的候选数
+
+ai_engine:
+  # subworkflow-as-await-binding（P1）：父节点等子任务改用 await binding + NodeAwaiting。
+  # 默认 false（父节点停 NodeRunning，由 recovery_scanner 兜底，即改造前行为）。
+  # ⚠️ P2 的 poll 对账兜底上线前，开启仅供灰度验证（丢事件/崩溃场景缺兜底）。
+  subworkflow_await_binding: true
+  # V2.4 Agent Planner 主路径开关。false 保持 V2.2 runtime，true 走 Planner -> ActionPlan。
+  agent_planner_enabled: true
+  # V2.2 Agent runtime 默认走 TurnInterpreter -> Sufficiency -> Policy -> Builder。
+  # 仅本地调试时整体切回 legacy；禁止按场景长期双轨。
+  agent_use_legacy_runtime: false
+  agent_shadow:
+    # 仅 agent_use_legacy_runtime=true 的短期调试模式下生效；默认关闭。
+    enabled: false
+    sample_rate: 0.0
+    skill_keys: [ "short_drama" ]
+    acts: [ "request_modification", "regenerate", "cancel", "smalltalk" ]
+    build_decision_shape: true
+    timeout_ms: 10
+  # V2.4 PR-I：LLM 语义解释器（仅辅助理解，不执行）。
+  # 默认 false：完全走规则 + V2.4 Planner，不调用 LLM。
+  # true：当规则无法判断（unknown）时，调用 LLM 把这句话解释成结构化语义，
+  #       再交由确定性 Planner / Policy / Validator 裁决；超时/解析失败/低置信均安全降级回规则。
+  # LLM 不创建任务、不调用工具、不生成 PlanCard、不绕过 Skill Contract，也不记录原始 prompt/输出/思维链。
+  agent_llm_interpreter:
+    enabled: false
+    timeout_ms: 800
+    min_confidence: 0.7
+    # provider 预留（当前由 LLM 路由按 capability 选择服务商）。
+    provider: ""
+    # model 可留空，留空时按 capability 走默认路由。
+    model: ""
+    capability: "intent_extraction"
+    temperature: 0.0
+    max_tokens: 200
