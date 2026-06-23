@@ -178,32 +178,3 @@ ai_engine:
   # 默认 false（父节点停 NodeRunning，由 recovery_scanner 兜底，即改造前行为）。
   # ⚠️ P2 的 poll 对账兜底上线前，开启仅供灰度验证（丢事件/崩溃场景缺兜底）。
   subworkflow_await_binding: true
-  # V2.4 Agent Planner 主路径开关。false 保持 V2.2 runtime，true 走 Planner -> ActionPlan。
-  agent_planner_enabled: true
-  # V2.2 Agent runtime 默认走 TurnInterpreter -> Sufficiency -> Policy -> Builder。
-  # 仅本地调试时整体切回 legacy；禁止按场景长期双轨。
-  agent_use_legacy_runtime: false
-  agent_shadow:
-    # 仅 agent_use_legacy_runtime=true 的短期调试模式下生效；默认关闭。
-    enabled: false
-    sample_rate: 0.0
-    skill_keys: [ "short_drama" ]
-    acts: [ "request_modification", "regenerate", "cancel", "smalltalk" ]
-    build_decision_shape: true
-    timeout_ms: 10
-  # V2.4 PR-I：LLM 语义解释器（仅辅助理解，不执行）。
-  # 默认 false：完全走规则 + V2.4 Planner，不调用 LLM。
-  # true：当规则无法判断（unknown）时，调用 LLM 把这句话解释成结构化语义，
-  #       再交由确定性 Planner / Policy / Validator 裁决；超时/解析失败/低置信均安全降级回规则。
-  # LLM 不创建任务、不调用工具、不生成 PlanCard、不绕过 Skill Contract，也不记录原始 prompt/输出/思维链。
-  agent_llm_interpreter:
-    enabled: false
-    timeout_ms: 800
-    min_confidence: 0.7
-    # provider 预留（当前由 LLM 路由按 capability 选择服务商）。
-    provider: ""
-    # model 可留空，留空时按 capability 走默认路由。
-    model: ""
-    capability: "intent_extraction"
-    temperature: 0.0
-    max_tokens: 200
