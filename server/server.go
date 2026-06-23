@@ -2,8 +2,10 @@ package server
 
 import (
 	"context"
+	"flux/demo"
 	"flux/internal/config"
 	"flux/internal/consts"
+	"flux/tool/builtin"
 	"fmt"
 	"log"
 	"strings"
@@ -83,7 +85,7 @@ func NewServer(db *gorm.DB, rdb *redis.Client, cfg *config.Config) *Server {
 	//--------------------------------
 	toolRegistry := tool.NewRegistry()
 
-	//toolRegistry.Register(builtin.NewSelectBGMTool())
+	toolRegistry.Register(builtin.NewMergeResultTool())
 
 	nodeRegistry := nodes.InitNodeRegistry(toolRegistry)
 
@@ -92,7 +94,7 @@ func NewServer(db *gorm.DB, rdb *redis.Client, cfg *config.Config) *Server {
 		workflowRepo,
 		workflowVersionRepo,
 	)
-
+	wfRegistry.Register(demo.AwaitUserChoiceDemoWorkflow())
 	ctx := context.Background()
 
 	// 同步工作流程模版到数据库
