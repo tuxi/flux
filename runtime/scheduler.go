@@ -7,6 +7,7 @@ import (
 )
 
 var ErrDeadlock = errors.New("runtime: no runnable node and not done (dependency deadlock)")
+var ErrMaxSteps = errors.New("runtime: max steps exceeded")
 
 type RunStatus uint8
 
@@ -27,9 +28,10 @@ type Scheduler struct {
 	plan    *Plan // 累积的计划（动态前沿会往里追加）
 	invoker Invoker
 	await   AwaitController
-	store   Store
-	emit    Emitter
-	tracer  *tracer // nil ⇒ 不记录 trace（sidecar 默认关闭，决策无副作用）
+	store    Store
+	emit     Emitter
+	tracer   *tracer // nil ⇒ 不记录 trace（sidecar 默认关闭，决策无副作用）
+	maxSteps int     // >0 ⇒ Run 单次循环硬上限（FR6：防 control loop runaway），0=无限
 }
 
 func NewScheduler(inv Invoker, aw AwaitController, st Store, em Emitter) *Scheduler {
@@ -49,9 +51,23 @@ func (s *Scheduler) WithTrace(sink TraceSink, runID string) *Scheduler {
 	return s
 }
 
+// WithMaxSteps 设置 Run 单次循环的硬上限（FR6：control loop 的停机保证，
+// 独立于 planner 的 done——防 LLM 永不终止 / 震荡）。超限返回 ErrMaxSteps。0=不限制。
+// additive：不改 NewScheduler/Run 签名。
+func (s *Scheduler) WithMaxSteps(n int) *Scheduler {
+	s.maxSteps = n
+	return s
+}
+
 // Run 驱动一次（可恢复的）执行。返回 Suspended 时，外部事件到达后调用 Resume 再次进入。
 func (s *Scheduler) Run(ctx context.Context, src PlanSource, state ExecState) (Result, error) {
+	steps := 0
 	for {
+		steps++
+		if s.maxSteps > 0 && steps > s.maxSteps {
+			return Result{Status: StatusFailed, Err: ErrMaxSteps}, ErrMaxSteps
+		}
+
 		// 1) 向计划源拉新增节点（静态=整图一次；planner=下一步）
 		added, done, err := src.Next(ctx, state)
 		if err != nil {
@@ -75,7 +91,7 @@ func (s *Scheduler) Run(ctx context.Context, src PlanSource, state ExecState) (R
 		// 2) 求就绪集：自身 pending 且依赖按 Join 语义满足
 		runnable := s.pickRunnable(state)
 
-		// 3) 没有可跑的 —— 判断挂起 / 完成 / 等 planner / 死锁
+		// 3) 没有可跑的 —— 判断挂起 / 完成 / 停滞
 		if len(runnable) == 0 {
 			switch {
 			case s.hasAwaiting(state):
@@ -83,12 +99,10 @@ func (s *Scheduler) Run(ctx context.Context, src PlanSource, state ExecState) (R
 				return Result{Status: StatusSuspended}, nil
 			case done && s.allTerminal(state):
 				return Result{Status: StatusCompleted}, nil
-			case !done:
-				// planner 还没说结束，但当前没活可干 —— 让它再产下一批。
-				// 真实现里这里应阻塞等待 planner 信号，避免忙等；草案先简单退避。
-				time.Sleep(10 * time.Millisecond)
-				continue
 			default:
+				// 不再 busy-wait：无可跑/挂起节点且 planner 未结束 ⇒ 计划停滞
+				// （依赖不满足 / planner 空转）。直接报错，避免静默自旋。
+				// control loop 的"未结束"由 planner 每轮返回新节点驱动；真停滞即 bug。
 				return Result{Status: StatusFailed, Err: ErrDeadlock}, ErrDeadlock
 			}
 		}
