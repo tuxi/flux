@@ -36,7 +36,7 @@ func (d *defaultDatabase) DB() *gorm.DB {
 
 func (d *defaultDatabase) CloseDB() {
 	// 关闭主数据库
-	if d.db == nil {
+	if d.db != nil {
 		db, _ := d.db.DB()
 		if db != nil {
 			_ = db.Close()

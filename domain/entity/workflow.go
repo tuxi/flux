@@ -44,7 +44,7 @@ type WorkflowVersionModel struct {
 	//  ]
 	//}
 	DefinitionJSON datatypes.JSON `gorm:"type:jsonb"`
-	Hash           string         `gorm:"varchar(64)"`
+	Hash           string         `gorm:"type:varchar(64)"`
 	CreatedAt      time.Time
 }
 
