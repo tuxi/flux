@@ -51,3 +51,5 @@ deploy/
 assets/
 swag-docs/
 main
+
+flux-agent
