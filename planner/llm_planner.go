@@ -56,6 +56,12 @@ type pendingCall struct {
 	NodeName   string
 }
 
+// History 返回当前完整对话历史（供会话持久化导出）。
+func (p *LLMPlanner) History() []model.Message { return p.messages }
+
+// SetHistory 载入已保存的对话历史（续接会话）。需在 Run 之前调用。
+func (p *LLMPlanner) SetHistory(h []model.Message) { p.messages = h }
+
 // GaveUpError 表示 agent **主动判定目标不可达/前提不成立**而终止（FR6）。
 // 它不是执行失败，而是"识别到无法完成并报告原因"——调用方（CLI）应区别于 error 对待。
 type GaveUpError struct{ Reason string }
@@ -131,16 +137,16 @@ func (p *LLMPlanner) Next(ctx context.Context, state runtime.ExecState) ([]*runt
 	}
 	p.pending = nil
 
-	// 2) 首轮注入 system + user。
+	// 2) 首轮注入。续接会话时 messages 已载入历史 → 不重发 system，只把新目标追加为 user。
 	if p.round == 1 {
-		sys := p.System
-		if sys == "" {
-			sys = defaultSystemPrompt
+		if len(p.messages) == 0 {
+			sys := p.System
+			if sys == "" {
+				sys = defaultSystemPrompt
+			}
+			p.messages = append(p.messages, model.Message{Role: "system", Content: sys})
 		}
-		p.messages = append(p.messages,
-			model.Message{Role: "system", Content: sys},
-			model.Message{Role: "user", Content: p.Goal},
-		)
+		p.messages = append(p.messages, model.Message{Role: "user", Content: p.Goal})
 	}
 
 	// 3) 调 LLM。

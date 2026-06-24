@@ -33,6 +33,7 @@ import (
 	"flux/model"
 	"flux/planner"
 	"flux/runtime"
+	"flux/session"
 	"flux/tool"
 	"flux/tool/builtin"
 )
@@ -41,8 +42,10 @@ func main() {
 	baseURL := flag.String("base-url", envOr("LLM_BASE_URL", "https://api.deepseek.com/v1"), "OpenAI-compatible base url")
 	modelName := flag.String("model", envOr("LLM_MODEL", "deepseek-chat"), "model name")
 	maxRounds := flag.Int("max-rounds", 20, "planner 回合上限（FR6 停机保证）")
+	cont := flag.Bool("continue", false, "续接该仓库上次的会话")
 	flag.Usage = func() {
-		fmt.Fprintln(os.Stderr, "usage: flux-agent [flags] <repo-dir> \"<goal>\"")
+		fmt.Fprintln(os.Stderr, "usage: flux-agent [flags] \"<goal>\"            (repo = 当前目录)")
+		fmt.Fprintln(os.Stderr, "       flux-agent [flags] <repo-dir> \"<goal>\"")
 		flag.PrintDefaults()
 	}
 	flag.Parse()
@@ -51,12 +54,18 @@ func main() {
 	if apiKey == "" {
 		fail("缺少 LLM_API_KEY 环境变量")
 	}
+	// 参数：<goal> 或 <repo-dir> <goal>。只给一个 ⇒ 它是 goal，repo 默认当前目录。
 	args := flag.Args()
-	if len(args) < 2 {
+	var repoDir, goal string
+	switch len(args) {
+	case 1:
+		repoDir, goal = ".", args[0]
+	case 2:
+		repoDir, goal = args[0], args[1]
+	default:
 		flag.Usage()
 		os.Exit(2)
 	}
-	repoDir, goal := args[0], args[1]
 	if abs, err := filepath.Abs(repoDir); err == nil {
 		repoDir = abs
 	}
@@ -96,8 +105,22 @@ func main() {
 	// ── planner + 实时 observability ──
 	p := planner.NewLLMPlanner(model.NewOpenAICompatibleProvider(*baseURL, apiKey), *modelName, goal, reg)
 	p.MaxRounds = *maxRounds
+
+	// 会话持久化：通过 session.Store 端口（单机 = FileStore，服务端 = Postgres）。
+	sessStore := session.NewFileStore(filepath.Join(homeDir(), ".flux-agent", "sessions"))
+	if *cont {
+		s, err := sessStore.Load(ctx, repoDir)
+		if err != nil {
+			fmt.Printf("（无法续接上次会话：%v —— 按全新会话开始）\n", err)
+		} else if s != nil && len(s.Messages) > 0 {
+			p.SetHistory(s.Messages)
+			fmt.Printf("（续接上次会话，载入 %d 条消息）\n", len(s.Messages))
+		}
+	}
+	var finalText string
 	p.OnAssistant = func(text string) {
-		fmt.Printf("💭 %s\n", truncate(text, 400))
+		finalText = text                        // 完整留存最终回答
+		fmt.Printf("💭 %s\n", truncate(text, 400)) // 直播仍截断，保持滚动可读
 	}
 
 	sched := runtime.NewScheduler(planner.NewToolInvoker(reg), planner.NopAwait{},
@@ -108,7 +131,17 @@ func main() {
 	st := runtime.NewMemState(nil)
 	res, err := sched.Run(ctx, p, st)
 
+	// 存盘，供下次 --continue 续接。
+	s := &session.Session{Key: repoDir, Workdir: repoDir, Messages: p.History(), UpdatedAt: time.Now()}
+	if saveErr := sessStore.Save(ctx, s); saveErr != nil {
+		fmt.Printf("（会话保存失败：%v）\n", saveErr)
+	}
+
 	fmt.Println("──────────────────────────────────────────")
+	if finalText != "" {
+		// 完整打印最终回答 —— 对"分析/回答"型任务，这才是交付物。
+		fmt.Printf("📄 最终回答：\n%s\n\n", finalText)
+	}
 	var gaveUp *planner.GaveUpError
 	switch {
 	case errors.As(err, &gaveUp):
@@ -186,6 +219,14 @@ func truncate(s string, n int) string {
 		return s
 	}
 	return s[:n] + "…"
+}
+
+func homeDir() string {
+	d, err := os.UserHomeDir()
+	if err != nil {
+		return os.TempDir()
+	}
+	return d
 }
 
 func envOr(key, def string) string {
