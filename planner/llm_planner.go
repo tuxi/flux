@@ -192,11 +192,26 @@ func buildToolDefinitions(reg *tool.Registry) []model.ToolDefinition {
 			Function: model.FunctionSchema{
 				Name:        t.Name(),
 				Description: t.Description(),
-				Parameters:  dataSchemaToJSONSchema(t.InputSchema()),
+				Parameters:  toolParameters(t),
 			},
 		})
 	}
 	return defs
+}
+
+// toolParameters 优先用工具的原生 JSON Schema（MCP 工具通过 RawInputSchema 直供，
+// 见 mcp.ToolAdapter）——避免 JSON Schema → DataSchema → JSON Schema 的有损往返。
+// 没有原生 schema 的本地工具退回到 DataSchema 映射。
+func toolParameters(t tool.Tool) map[string]any {
+	if rs, ok := t.(interface{ RawInputSchema() json.RawMessage }); ok {
+		if raw := rs.RawInputSchema(); len(raw) > 0 {
+			var params map[string]any
+			if json.Unmarshal(raw, &params) == nil && len(params) > 0 {
+				return params
+			}
+		}
+	}
+	return dataSchemaToJSONSchema(t.InputSchema())
 }
 
 func dataSchemaToJSONSchema(ds tool.DataSchema) map[string]any {
