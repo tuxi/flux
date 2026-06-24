@@ -26,7 +26,22 @@ requirements FR1 的两种 PlanSource 策略都已用真实 LLM（deepseek）实
 
 ---
 
-## M2 — Productization（当前）：第一个产品 = 代码 agent
+## M2 — Productization
+
+### A：代码 agent ✅ 完成（2026-06-24）
+
+- [x] CLI（默认 cwd、`--continue`、实时 observability）
+- [x] 工具：read_file、grep、shell、write_file + MCP filesystem（14 工具）
+- [x] FR6 终止（give_up + 无进展检测）
+- [x] 会话持久化（`session.Store` + FileStore）
+- [x] 大仓库 scale 验证通过（flux 自身 300 文件 trace 任务 100% 准确）
+- [x] README + 打包
+
+### B：内容/电商异步工作流 Agent ← 当前
+
+详见 [B-plan.md](B-plan.md)。与 A 的关键差异：异步长任务、外部 Provider、成本、持久化 engine。
+
+
 
 **不是技术深化，是把 v2 收敛成真正可用的东西。**
 **方法论**：建**最薄的真实代码 agent**，跑在真实的现有代码任务上，**让失败告诉我们 M2.x 里哪些真要做**——而不是把下面的清单当待办逐个建。
