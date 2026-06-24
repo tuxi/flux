@@ -85,6 +85,7 @@ func main() {
 	// ── 工具池 ──
 	reg := tool.NewRegistry()
 	reg.Register(builtin.NewShellTool(repoDir))
+	reg.Register(builtin.NewGrepTool(repoDir))
 
 	mc, err := mcp.NewStdioClient(ctx, "npx",
 		[]string{"-y", "@modelcontextprotocol/server-filesystem", repoDir}, nil)
@@ -98,7 +99,7 @@ func main() {
 	}
 
 	fmt.Printf("flux-agent | model=%s | repo=%s\n", *modelName, repoDir)
-	fmt.Printf("工具：shell + %d 个 MCP filesystem 工具\n", len(mcpNames))
+	fmt.Printf("工具：shell + grep + %d 个 MCP filesystem 工具\n", len(mcpNames))
 	fmt.Printf("目标：%s\n", goal)
 	fmt.Println("──────────────────────────────────────────")
 
