@@ -18,25 +18,35 @@ type ToolAdapter struct {
 	info       ToolInfo
 }
 
-// 编译期确认实现 tool.Tool。
-var _ tool.Tool = (*ToolAdapter)(nil)
+// 编译期确认实现 tool.Tool + tool.DefinedTool（阶段 C：原生暴露 JSON Schema 定义）。
+var (
+	_ tool.Tool        = (*ToolAdapter)(nil)
+	_ tool.DefinedTool = (*ToolAdapter)(nil)
+)
 
-func (a *ToolAdapter) Name() string        { return a.name }
-func (a *ToolAdapter) Description() string  { return a.info.Description }
-func (a *ToolAdapter) Mode() tool.ExecutionMode { return tool.SyncExecution }
+func (a *ToolAdapter) Name() string             { return a.name }
+func (a *ToolAdapter) Description() string       { return a.info.Description }
+func (a *ToolAdapter) Mode() tool.ExecutionMode  { return tool.SyncExecution }
 
-// InputSchema 是把 MCP 的 JSON Schema 有损压成 DataSchema（满足 tool.Tool 接口）。
-// planner 实际上会优先用 RawInputSchema() 拿原生 JSON Schema，不走这条有损路径。
+// Definition 直供 MCP 原生定义（JSON Schema 原样）。这是阶段 C 把旧 RawInputSchema 旁路
+// 转正后的正式出口：DefinitionOf 见到 DefinedTool 即直接采用，不走 DataSchema 合成。
+func (a *ToolAdapter) Definition() tool.ToolDefinition {
+	return tool.ToolDefinition{
+		Name:        a.name,
+		Description: a.info.Description,
+		InputSchema: a.info.InputSchema, // 原生 JSON Schema，无损
+		Annotations: tool.Annotations{Execution: tool.SyncExecution},
+	}
+}
+
+// InputSchema 把 MCP 的 JSON Schema 有损压成 DataSchema（仅为满足 tool.Tool 接口 /
+// 兼容仍读 DataSchema 的旧消费者）。需要无损定义的消费者请用 tool.DefinitionOf。
 func (a *ToolAdapter) InputSchema() tool.DataSchema {
 	return jsonSchemaToDataSchema(a.info.InputSchema)
 }
 
 // OutputSchema：MCP tools/list 不带 output schema，返回空。
 func (a *ToolAdapter) OutputSchema() tool.DataSchema { return tool.DataSchema{} }
-
-// RawInputSchema 直供 MCP 原生 JSON Schema（可选接口；planner 优先用它，避免有损往返）。
-// 这是主线二 C 阶段"定义层向 MCP 看齐"的接缝。
-func (a *ToolAdapter) RawInputSchema() json.RawMessage { return a.info.InputSchema }
 
 // Execute 转译到 MCP tools/call。
 //

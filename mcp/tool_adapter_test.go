@@ -52,13 +52,13 @@ func TestMCP_Adapter_RegistryRoundTrip(t *testing.T) {
 		t.Fatalf("fs_list_directory 未注册，实际: %v", names)
 	}
 
-	// 1) 原生 JSON Schema 直供（A.2 关键：不走有损 DataSchema）
-	rs, ok := tl.(interface{ RawInputSchema() json.RawMessage })
+	// 1) 原生 JSON Schema 直供（阶段 C：DefinedTool.Definition()，不走有损 DataSchema）
+	dt, ok := tl.(tool.DefinedTool)
 	if !ok {
-		t.Fatal("MCP 适配器应实现 RawInputSchema()")
+		t.Fatal("MCP 适配器应实现 tool.DefinedTool")
 	}
-	if !json.Valid(rs.RawInputSchema()) {
-		t.Fatal("RawInputSchema 应是合法 JSON Schema")
+	if !json.Valid(dt.Definition().InputSchema) {
+		t.Fatal("Definition().InputSchema 应是合法 JSON Schema")
 	}
 
 	// 2) 从 Registry 执行，行为与直接 client 调用一致

@@ -181,74 +181,26 @@ func (p *LLMPlanner) Next(ctx context.Context, state runtime.ExecState) ([]*runt
 }
 
 // buildToolDefinitions 把 tool.Registry 转成 OpenAI tool_calls 兼容的 schema。
-// M1：用现有 DataSchema 直接映射；M3 升级到 MCP/JSON Schema 后这里换实现即可，
-// LLMPlanner 其它部分不动（FR7）。
+//
+// 阶段 C：统一经 tool.DefinitionOf 取定义——本地工具（DataSchema 合成）与 MCP 工具
+// （原生 JSON Schema，DefinedTool）一视同仁，不再有 planner 端的旁路断言。
 func buildToolDefinitions(reg *tool.Registry) []model.ToolDefinition {
 	tools := reg.List()
 	defs := make([]model.ToolDefinition, 0, len(tools))
 	for _, t := range tools {
+		d := tool.DefinitionOf(t)
+		var params map[string]any
+		if err := json.Unmarshal(d.InputSchema, &params); err != nil || params == nil {
+			params = map[string]any{"type": "object", "properties": map[string]any{}}
+		}
 		defs = append(defs, model.ToolDefinition{
 			Type: "function",
 			Function: model.FunctionSchema{
-				Name:        t.Name(),
-				Description: t.Description(),
-				Parameters:  toolParameters(t),
+				Name:        d.Name,
+				Description: d.Description,
+				Parameters:  params,
 			},
 		})
 	}
 	return defs
-}
-
-// toolParameters 优先用工具的原生 JSON Schema（MCP 工具通过 RawInputSchema 直供，
-// 见 mcp.ToolAdapter）——避免 JSON Schema → DataSchema → JSON Schema 的有损往返。
-// 没有原生 schema 的本地工具退回到 DataSchema 映射。
-func toolParameters(t tool.Tool) map[string]any {
-	if rs, ok := t.(interface{ RawInputSchema() json.RawMessage }); ok {
-		if raw := rs.RawInputSchema(); len(raw) > 0 {
-			var params map[string]any
-			if json.Unmarshal(raw, &params) == nil && len(params) > 0 {
-				return params
-			}
-		}
-	}
-	return dataSchemaToJSONSchema(t.InputSchema())
-}
-
-func dataSchemaToJSONSchema(ds tool.DataSchema) map[string]any {
-	props := map[string]any{}
-	var required []string
-	for name, f := range ds.Fields {
-		props[name] = map[string]any{
-			"type":        normalizeJSONType(f.Type),
-			"description": f.Desc,
-		}
-		if f.Required {
-			required = append(required, name)
-		}
-	}
-	out := map[string]any{
-		"type":       "object",
-		"properties": props,
-	}
-	if len(required) > 0 {
-		out["required"] = required
-	}
-	return out
-}
-
-func normalizeJSONType(t string) string {
-	switch t {
-	case "bool", "boolean":
-		return "boolean"
-	case "integer":
-		return "integer"
-	case "number":
-		return "number"
-	case "array":
-		return "array"
-	case "object":
-		return "object"
-	default:
-		return "string"
-	}
 }
