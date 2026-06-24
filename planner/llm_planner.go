@@ -27,19 +27,28 @@ import (
 //	p.MaxRounds = 8 // FR6：planner 自带的迭代上限；kernel 的 WithMaxSteps 是兜底
 //	sched.Run(ctx, p, state)
 type LLMPlanner struct {
-	Provider  *model.OpenAICompatibleProvider
+	Provider  model.Completer
 	Model     string
 	Goal      string
 	System    string // 可选；为空时用 defaultSystemPrompt
 	MaxRounds int    // FR6：planner 自带的回合上限（默认 10）
 
+	// NoProgressLimit FR6：同一个 (tool, args) 动作重复达到此次数即判定无进展并终止（默认 4）。
+	// 这是"卡在原地打转"的硬安全网，独立于 LLM 主动 give_up。
+	NoProgressLimit int
+
+	// OnAssistant 可选：每轮拿到 LLM 回复后回调其文本（推理/说明）。
+	// 用于 observability（CLI 实时显示"thinking"）；nil 即无操作。
+	OnAssistant func(content string)
+
 	registry *tool.Registry
 	tools    []model.ToolDefinition
 
-	messages []model.Message
-	pending  []pendingCall // 上一轮返回的节点，待回喂结果
-	round    int
-	done     bool
+	messages     []model.Message
+	pending      []pendingCall // 上一轮返回的节点，待回喂结果
+	round        int
+	done         bool
+	actionCounts map[string]int // FR6：(tool,args) 签名 → 出现次数
 }
 
 type pendingCall struct {
@@ -47,16 +56,24 @@ type pendingCall struct {
 	NodeName   string
 }
 
+// GaveUpError 表示 agent **主动判定目标不可达/前提不成立**而终止（FR6）。
+// 它不是执行失败，而是"识别到无法完成并报告原因"——调用方（CLI）应区别于 error 对待。
+type GaveUpError struct{ Reason string }
+
+func (e *GaveUpError) Error() string { return "agent gave up: " + e.Reason }
+
 // NewLLMPlanner 用 Registry 里**所有工具**作为模型菜单（M1：工具少，先全量喂；
-// FR7：将来工具多了再做按目标筛选）。
-func NewLLMPlanner(provider *model.OpenAICompatibleProvider, modelName, goal string, reg *tool.Registry) *LLMPlanner {
+// FR7：将来工具多了再做按目标筛选）。额外附带一个 give_up 元工具（FR6 退出阀）。
+func NewLLMPlanner(provider model.Completer, modelName, goal string, reg *tool.Registry) *LLMPlanner {
 	return &LLMPlanner{
-		Provider:  provider,
-		Model:     modelName,
-		Goal:      goal,
-		MaxRounds: 10,
-		registry:  reg,
-		tools:     buildToolDefinitions(reg),
+		Provider:        provider,
+		Model:           modelName,
+		Goal:            goal,
+		MaxRounds:       10,
+		NoProgressLimit: 4,
+		registry:        reg,
+		tools:           append(buildToolDefinitions(reg), giveUpTool),
+		actionCounts:    map[string]int{},
 	}
 }
 
@@ -65,7 +82,29 @@ const defaultSystemPrompt = `You are an autonomous agent that completes a goal b
 Iterate: examine prior tool results, call the next tool you need, observe its output, and continue.
 When the goal is satisfied, STOP CALLING TOOLS — reply with a brief final message instead.
 Never explain plans in prose while there are tool calls to make: emit the tool calls.
+
+IMPORTANT — do not invent work. If, after exploring, the goal's premise does not hold
+(e.g. it says "fix the failing test" but there is no failing test, or the referenced file
+does not exist), call the give_up tool with a clear reason. Do NOT fabricate files or tasks
+to make the goal seem satisfiable.
+
 The user message is the goal.`
+
+// giveUpTool 是 FR6 的退出阀：让 LLM 在目标不可达时主动、带原因地终止。
+var giveUpTool = model.ToolDefinition{
+	Type: "function",
+	Function: model.FunctionSchema{
+		Name:        "give_up",
+		Description: "当目标无法完成时调用（例如要修的失败测试根本不存在、引用的文件缺失、前提不成立）。给出 reason 说明原因，而不是凭空造任务。",
+		Parameters: map[string]any{
+			"type": "object",
+			"properties": map[string]any{
+				"reason": map[string]any{"type": "string", "description": "为什么无法完成"},
+			},
+			"required": []string{"reason"},
+		},
+	},
+}
 
 // Next 是 runtime.PlanSource 的实现。
 func (p *LLMPlanner) Next(ctx context.Context, state runtime.ExecState) ([]*runtime.PlanNode, bool, error) {
@@ -121,11 +160,34 @@ func (p *LLMPlanner) Next(ctx context.Context, state runtime.ExecState) ([]*runt
 		Content:   resp.Content,
 		ToolCalls: resp.ToolCalls,
 	})
+	if p.OnAssistant != nil && resp.Content != "" {
+		p.OnAssistant(resp.Content)
+	}
 
 	// 5) 没调工具 ⇒ LLM 决定完成。
 	if len(resp.ToolCalls) == 0 {
 		p.done = true
 		return nil, true, nil
+	}
+
+	// 5.1) FR6 退出阀：LLM 主动 give_up ⇒ 带原因终止（不可达，不是执行失败）。
+	for _, tc := range resp.ToolCalls {
+		if tc.Function.Name == "give_up" {
+			p.done = true
+			return nil, true, &GaveUpError{Reason: giveUpReason(tc.Function.Arguments)}
+		}
+	}
+
+	// 5.2) FR6 无进展安全网：同一 (tool,args) 动作重复达到上限 ⇒ 判定卡死并终止。
+	for _, tc := range resp.ToolCalls {
+		sig := tc.Function.Name + "|" + tc.Function.Arguments
+		p.actionCounts[sig]++
+		if p.NoProgressLimit > 0 && p.actionCounts[sig] >= p.NoProgressLimit {
+			p.done = true
+			return nil, true, &GaveUpError{Reason: fmt.Sprintf(
+				"无进展：重复执行 %s 达 %d 次仍未推进，可能卡死或目标不可达",
+				tc.Function.Name, p.actionCounts[sig])}
+		}
 	}
 
 	// 6) 翻译 tool_calls → PlanNode。
@@ -178,6 +240,19 @@ func (p *LLMPlanner) Next(ctx context.Context, state runtime.ExecState) ([]*runt
 	}
 
 	return added, false, nil
+}
+
+func giveUpReason(args string) string {
+	var p struct {
+		Reason string `json:"reason"`
+	}
+	if args != "" {
+		_ = json.Unmarshal([]byte(args), &p)
+	}
+	if p.Reason == "" {
+		return "（未给原因）"
+	}
+	return p.Reason
 }
 
 // buildToolDefinitions 把 tool.Registry 转成 OpenAI tool_calls 兼容的 schema。

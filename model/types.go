@@ -4,7 +4,16 @@
 // CompleteStream 实现（同一组类型）。
 package model
 
-import "fmt"
+import (
+	"context"
+	"fmt"
+)
+
+// Completer 抽象出 Complete，便于注入测试用假实现做 hermetic 测试。
+// *OpenAICompatibleProvider 满足它。
+type Completer interface {
+	Complete(ctx context.Context, req Request) (Response, error)
+}
 
 // Message 一条对话消息。role: system / user / assistant / tool。
 type Message struct {
