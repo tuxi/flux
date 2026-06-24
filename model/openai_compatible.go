@@ -32,7 +32,7 @@ type chatCompletionRequest struct {
 	Messages    []Message        `json:"messages"`
 	Temperature float64          `json:"temperature,omitempty"`
 	Tools       []ToolDefinition `json:"tools,omitempty"`
-	ToolChoice  string           `json:"tool_choice,omitempty"`
+	ToolChoice  any              `json:"tool_choice,omitempty"`
 }
 
 type chatCompletionResponse struct {

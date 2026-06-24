@@ -44,7 +44,9 @@ type Request struct {
 	Messages    []Message        `json:"messages"`
 	Temperature float64          `json:"temperature,omitempty"`
 	Tools       []ToolDefinition `json:"tools,omitempty"`
-	ToolChoice  string           `json:"tool_choice,omitempty"`
+	// ToolChoice 可为字符串（"auto"/"none"/"required"）或对象
+	// （{"type":"function","function":{"name":"X"}} 强制调用某个函数）。
+	ToolChoice any `json:"tool_choice,omitempty"`
 }
 
 type Response struct {
