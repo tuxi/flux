@@ -10,9 +10,13 @@ package planner
 // FR5：LLM 生成的图可能引用不存在的工具/坏依赖/有环/缺必填参数，必须**执行前校验**；
 // 校验失败把错误喂回 LLM 重生（generate → validate → repair，规划期循环）。
 //
-// 本版范围（诚实标注）：节点参数为**具体值**，暂不支持"引用上游节点输出"的数据流接线
-// （即 workflow input_mapping 那种 node_x.output.y）。这让首个类型 B 证明聚焦在
-// "LLM 生成带依赖/并行的 DAG + 校验 + kernel 调度"，数据流接线留待后续。
+// 数据流接线：节点参数里可放**引用对象** {"$from":"<上游节点id>","field":"<输出字段>"}，
+// 运行时 Resolve 从 ExecState 取上游产出替换（field 省略则取整个 output）。
+// FR5 强约束：被 $from 引用的节点必须在该节点 depends_on 里——数据依赖必须是图的边。
+//
+// 本版范围（诚实标注）：引用是**整值替换**（一个参数值整体来自某上游输出），暂不支持
+// "把上游值插进字符串模板"的字符串内插，也不支持引用里再做表达式运算。够干常见活
+// （把上游产出的 url/id/path 喂给下游），更复杂的接线留待后续。
 
 import (
 	"context"
@@ -33,6 +37,7 @@ type DAGPlanner struct {
 	MaxRepairs int // FR5/FR6：generate→validate→repair 的最大修复轮数（默认 3）
 
 	registry *tool.Registry
+	lastSpec planSpec // 最近一次校验通过的计划（供检视/调试）
 }
 
 func NewDAGPlanner(provider *model.OpenAICompatibleProvider, modelName, goal string, reg *tool.Registry) *DAGPlanner {
@@ -61,10 +66,12 @@ const dagSystemPrompt = `You are a planner. Given a goal and a catalog of tools,
 execution plan as a directed acyclic graph by calling submit_plan exactly once.
 
 Rules:
-- Each node is exactly one tool call with concrete arguments.
+- Each node is exactly one tool call.
 - Use depends_on to express ordering: a node runs only after ALL nodes it lists have succeeded.
 - Independent nodes (empty depends_on) may run in parallel — express real parallelism this way.
-- Arguments must be concrete values (you cannot reference other nodes' outputs in this version).
+- An argument value may be a literal, OR a reference to an upstream node's output:
+  {"$from": "<node id>", "field": "<output field name>"}  (omit "field" for the whole output object).
+  ANY node referenced via $from MUST be listed in that node's depends_on (a data dependency is a graph edge).
 - Do NOT call the tools yourself. Call ONLY submit_plan, once, with the whole plan.`
 
 // Generate 让 LLM 产出一张校验通过的 DAG，返回可执行的 runtime.Plan。
@@ -110,6 +117,7 @@ func (p *DAGPlanner) Generate(ctx context.Context) (*runtime.Plan, error) {
 			continue
 		}
 
+		p.lastSpec = spec
 		return buildPlan(spec), nil
 	}
 	return nil, fmt.Errorf("dag planner: plan did not validate within %d repair rounds", p.MaxRepairs)
@@ -145,6 +153,20 @@ func validatePlan(spec planSpec, reg *tool.Registry) []string {
 				errs = append(errs, fmt.Sprintf("node %q: depends_on references unknown node %q", n.ID, d))
 			}
 		}
+		// 数据流引用（FR5）：每个 $from 目标必须存在，且必须是本节点的 depends_on 边，
+		// 否则 kernel 可能在上游产出前就跑本节点 —— 引用无法解析。
+		depSet := map[string]bool{}
+		for _, d := range n.DependsOn {
+			depSet[d] = true
+		}
+		for _, ref := range referencedNodes(n.Arguments) {
+			switch {
+			case !ids[ref]:
+				errs = append(errs, fmt.Sprintf("node %q: argument references unknown node %q", n.ID, ref))
+			case !depSet[ref]:
+				errs = append(errs, fmt.Sprintf("node %q: references %q but it is not in depends_on (data dependency must be a graph edge)", n.ID, ref))
+			}
+		}
 		if ok {
 			for _, req := range requiredFields(tool.DefinitionOf(t).InputSchema) {
 				if _, present := n.Arguments[req]; !present {
@@ -173,12 +195,87 @@ func buildPlan(spec planSpec) *runtime.Plan {
 			ToolName:  n.Tool,
 			DependsOn: n.DependsOn,
 			Join:      runtime.JoinAll,
-			Resolve: func(_ context.Context, _ runtime.ExecState) (map[string]any, error) {
-				return captured, nil // 类型 B 本版：具体值，无上游引用
+			Resolve: func(_ context.Context, state runtime.ExecState) (map[string]any, error) {
+				resolved, err := resolveRefs(captured, state)
+				if err != nil {
+					return nil, err
+				}
+				m, _ := resolved.(map[string]any)
+				if m == nil {
+					m = map[string]any{}
+				}
+				return m, nil
 			},
 		}
 	}
 	return plan
+}
+
+// resolveRefs 递归地把参数里的引用对象 {"$from":id,"field":f} 替换成上游节点的实际产出。
+// 上游 output 由 kernel 保证已存在（引用必是 depends_on 边，调度已等齐）。
+func resolveRefs(v any, state runtime.ExecState) (any, error) {
+	switch x := v.(type) {
+	case map[string]any:
+		if from, ok := x["$from"].(string); ok {
+			out := state.Output(from)
+			if out == nil {
+				return nil, fmt.Errorf("reference to node %q: no output available", from)
+			}
+			if f, ok := x["field"].(string); ok && f != "" {
+				val, present := out[f]
+				if !present {
+					return nil, fmt.Errorf("reference %q.%q: field not in output", from, f)
+				}
+				return val, nil
+			}
+			return out, nil
+		}
+		m := make(map[string]any, len(x))
+		for k, vv := range x {
+			r, err := resolveRefs(vv, state)
+			if err != nil {
+				return nil, err
+			}
+			m[k] = r
+		}
+		return m, nil
+	case []any:
+		arr := make([]any, len(x))
+		for i, e := range x {
+			r, err := resolveRefs(e, state)
+			if err != nil {
+				return nil, err
+			}
+			arr[i] = r
+		}
+		return arr, nil
+	default:
+		return v, nil
+	}
+}
+
+// referencedNodes 收集参数树里所有 $from 引用的节点 id（用于 FR5 校验）。
+func referencedNodes(args map[string]any) []string {
+	var refs []string
+	var walk func(any)
+	walk = func(v any) {
+		switch x := v.(type) {
+		case map[string]any:
+			if from, ok := x["$from"].(string); ok {
+				refs = append(refs, from)
+				return // 引用对象本身不再深入
+			}
+			for _, vv := range x {
+				walk(vv)
+			}
+		case []any:
+			for _, e := range x {
+				walk(e)
+			}
+		}
+	}
+	walk(args)
+	return refs
 }
 
 // cyclic 用 DFS 三色法检测依赖环。
