@@ -144,6 +144,13 @@ func NewRegistry() *Registry {
 	return &Registry{skills: map[string]ExecutableSkill{}}
 }
 
+// NewRegistryWith 从已有的 ExecutableSkill 创建 Registry（便捷方法）。
+func NewRegistryWith(exe ExecutableSkill) *Registry {
+	r := NewRegistry()
+	r.Register(exe.Definition().Name, exe)
+	return r
+}
+
 func (r *Registry) Register(name string, s ExecutableSkill) {
 	r.skills[name] = s
 }
