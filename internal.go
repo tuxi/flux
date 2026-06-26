@@ -32,15 +32,26 @@ func (i *internalInvoker) Invoke(ctx context.Context, toolName string, input map
 type internalAwait struct {
 	backend Backend
 	taskID  string
+	tr      *taskRuntime // 存 binding 索引
 }
 
 func (a *internalAwait) Begin(ctx context.Context, node *runtime.PlanNode, input map[string]any) (int64, error) {
-	bindingID, err := a.backend.CreateAwait(ctx, a.taskID, node.Name, "", input)
+	// 生成 providerTaskID（Phase 2: 由外部 Provider 返回真实 ID）
+	providerTaskID := a.taskID + "_" + node.Name
+
+	bindingID, err := a.backend.CreateAwait(ctx, a.taskID, node.Name, providerTaskID, input)
 	if err != nil {
 		return 0, err
 	}
-	_ = bindingID
-	return 1, nil // Phase 2: 返回真实的 binding 数字 ID
+
+	// 存入索引：后续 Notify 通过 providerTaskID 查找
+	a.tr.awaitIndex[providerTaskID] = bindingRef{
+		bindingID: bindingID,
+		nodeName:  node.Name,
+	}
+
+	// 返回 binding 的数字 ID（runtime 内部用）
+	return int64(len(a.tr.awaitIndex)), nil
 }
 
 type internalStore struct {
