@@ -51,7 +51,8 @@ var _ tool.Tool = (*ToolSkill)(nil)
 // DB(workflow_versions)、OSSURL、Git repo 的 workflow.yaml——引用解耦加载。
 type WorkflowSkill struct {
 	Def         tool.ToolDefinition
-	WorkflowRef string // 路径（相对 skill 目录）或 DB id 等引用——执行时再编译
+	WorkflowRef string // 路径（相对 Dir）或 DB id 等引用——执行时再编译
+	Dir         string // SKILL.md 所在目录（运行时拼接完整路径）
 }
 
 func (s *WorkflowSkill) Definition() tool.ToolDefinition { return s.Def }
@@ -97,7 +98,7 @@ func (r *Resolver) Resolve(spec *SkillSpec) (ExecutableSkill, error) {
 		return &ToolSkill{SkillName: spec.Name, Tool: t}, nil
 
 	case ImplWorkflow:
-		return &WorkflowSkill{Def: def, WorkflowRef: spec.Workflow}, nil
+		return &WorkflowSkill{Def: def, WorkflowRef: spec.Workflow, Dir: spec.Dir}, nil
 
 	case ImplAgent:
 		// S4 以前：只建定义，不提供 PlanSource

@@ -37,8 +37,9 @@ func AsTool(exe ExecutableSkill, runner WorkflowRunner) (tool.Tool, error) {
 			Description:    s.Def.Description,
 			Implementation: ImplWorkflow,
 			Workflow:       s.WorkflowRef,
+			Dir:            s.Dir, // 保留 skill 目录以拼接 workflow.yaml 完整路径
 		}
-		return NewSubWorkflowTool(spec, runner), nil
+		return NewSubWorkflowTool(spec, s.Def, runner), nil
 	case *AgentSkill:
 		return nil, fmt.Errorf("skill %q: agent skills not yet executable (S4)", s.Def.Name)
 	default:

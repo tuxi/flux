@@ -19,7 +19,8 @@ func TestSubWorkflowTool_IsATool(t *testing.T) {
 		Description:    "Generate product marketing videos",
 		Implementation: skill.ImplWorkflow,
 	}
-	tl := skill.NewSubWorkflowTool(spec, runner)
+	def := tool.ToolDefinition{Name: "generate_video", Description: "Generate product marketing videos"}
+	tl := skill.NewSubWorkflowTool(spec, def, runner)
 
 	// 1) 证实它满足 tool.Tool 接口
 	var _ tool.Tool = tl
@@ -47,7 +48,7 @@ func TestSubWorkflowTool_IsATool(t *testing.T) {
 	}
 
 	// 3) 没有 runner 时应失败
-	tlNoop := skill.NewSubWorkflowTool(spec, nil)
+	tlNoop := skill.NewSubWorkflowTool(spec, def, nil)
 	res2, _ := tlNoop.Execute(context.Background(), nil, nil)
 	if res2.Success {
 		t.Fatal("should fail without runner")
@@ -63,14 +64,15 @@ func TestSubWorkflowTool_DefinitionOf(t *testing.T) {
 	runner := func(_ context.Context, _ *skill.SkillSpec, _ map[string]any) (*tool.Result, error) {
 		return tool.Success(nil), nil
 	}
-	tl := skill.NewSubWorkflowTool(spec, runner)
+	def := tool.ToolDefinition{Name: "greet_workflow", Description: "Greeting workflow"}
+	tl := skill.NewSubWorkflowTool(spec, def, runner)
 
-	// tool.DefinitionOf 能正确处理它（用 DataSchema 合成 JSON Schema）
-	def := tool.DefinitionOf(tl)
-	if def.Name != "greet_workflow" {
-		t.Fatalf("DefinitionOf name: %q", def.Name)
+	// tool.DefinitionOf 应返回我们传入的 def（SubWorkflowTool 实现了 DefinedTool）
+	gotDef := tool.DefinitionOf(tl)
+	if gotDef.Name != "greet_workflow" {
+		t.Fatalf("DefinitionOf name: %q", gotDef.Name)
 	}
-	if def.Description != "Greeting workflow" {
-		t.Fatalf("DefinitionOf desc: %q", def.Description)
+	if gotDef.Description != "Greeting workflow" {
+		t.Fatalf("DefinitionOf desc: %q", gotDef.Description)
 	}
 }

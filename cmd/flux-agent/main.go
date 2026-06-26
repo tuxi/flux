@@ -29,6 +29,7 @@ import (
 	"regexp"
 	"time"
 
+	"flux/definition"
 	"flux/mcp"
 	"flux/model"
 	"flux/planner"
@@ -37,6 +38,9 @@ import (
 	"flux/skill"
 	"flux/tool"
 	"flux/tool/builtin"
+	"flux/workflow"
+
+	"gopkg.in/yaml.v3"
 )
 
 func main() {
@@ -111,10 +115,53 @@ func main() {
 		}
 		return nil, fmt.Errorf("skill 引用的工具 %q 未注册", name)
 	})
-	// WorkflowSkill 的执行入口。S3 之前先放观察桩：planner 一旦选中 workflow skill，
-	// trace 里会出现这条——那就是产品逼出 S3（engine.Run）的真实信号，而不是预先写死。
-	skillRunner := func(_ context.Context, spec *skill.SkillSpec, _ map[string]any) (*tool.Result, error) {
-		return tool.Fail(fmt.Errorf("workflow skill %q 尚未接入引擎执行（S3 待办）", spec.Name)), nil
+	// WorkflowSkill 的执行入口：编译 workflow.yaml → engine.Run → 返回结果。
+	// 子 workflow 用独立 scheduler 运行（隔离 trace，同一 tool registry）。
+	skillRunner := func(ctx context.Context, spec *skill.SkillSpec, input map[string]any) (*tool.Result, error) {
+		if spec.Dir == "" {
+			return tool.Fail(fmt.Errorf("workflow skill %q: Dir 为空，无法定位 workflow.yaml", spec.Name)), nil
+		}
+		wfPath := filepath.Join(spec.Dir, spec.Workflow)
+		wfData, err := os.ReadFile(wfPath)
+		if err != nil {
+			return tool.Fail(fmt.Errorf("workflow skill %q: 读取 %s 失败: %w", spec.Name, wfPath, err)), nil
+		}
+		// YAML → struct：yaml.v3 不认 json tag，先解成通用节点再经 JSON 桥接到 WorkflowDefinition。
+		var raw any
+		if err := yaml.Unmarshal(wfData, &raw); err != nil {
+			return tool.Fail(fmt.Errorf("workflow skill %q: YAML 解析失败: %w", spec.Name, err)), nil
+		}
+		jsonBytes, _ := json.Marshal(raw)
+		var wfDef definition.WorkflowDefinition
+		if err := json.Unmarshal(jsonBytes, &wfDef); err != nil {
+			return tool.Fail(fmt.Errorf("workflow skill %q: 定义解析失败: %w", spec.Name, err)), nil
+		}
+		plan, err := workflow.Compile(&wfDef, func(string) bool { return false })
+		if err != nil {
+			return tool.Fail(fmt.Errorf("workflow skill %q: 编译失败: %w", spec.Name, err)), nil
+		}
+		subSched := runtime.NewScheduler(
+			planner.NewToolInvoker(reg),
+			planner.NopAwait{},
+			planner.NopStore{},
+			planner.NopEmitter{},
+		).WithMaxSteps(50) // 子 workflow 独立步数限制
+		state := runtime.NewMemState(input)
+		res, err := subSched.Run(ctx, runtime.NewStaticSource(plan), state)
+		if err != nil {
+			return tool.Fail(fmt.Errorf("workflow skill %q: 执行失败: %w", spec.Name, err)), nil
+		}
+		if res.Status != runtime.StatusCompleted {
+			return tool.Fail(fmt.Errorf("workflow skill %q: 未完成（status=%d）", spec.Name, res.Status)), nil
+		}
+		// 收集所有节点输出作为 workflow 结果
+		outputs := map[string]any{}
+		for _, n := range state.Nodes() {
+			if o := state.Output(n); len(o) > 0 {
+				outputs[n] = o
+			}
+		}
+		return tool.Success(outputs), nil
 	}
 	skillReg := skill.NewRegistry()
 	_, _ = skill.LoadAndRegister(ctx, loader, resolver, skillReg)
