@@ -3,7 +3,6 @@ package handler
 import (
 	"context"
 	"encoding/json"
-	"flux/internal/consts"
 	"fmt"
 	"log"
 	"net/http"
@@ -16,11 +15,13 @@ import (
 	"flux/domain"
 	"flux/dto"
 	engine2 "flux/engine"
-	"flux/pkg/response"
-	"flux/pkg/uuid"
+	"flux/internal/consts"
 	repository2 "flux/repository"
-	"flux/service"
+	internalservice "flux/service"
 	"flux/workflow"
+	"github.com/tuxi/dream-ai/ai-engine/service"
+	"github.com/tuxi/dream-ai/pkg/response"
+	"github.com/tuxi/dream-ai/utils/uuid"
 
 	"github.com/gin-gonic/gin"
 	"github.com/go-playground/validator/v10"
@@ -41,14 +42,15 @@ type WorkflowHandler struct {
 	mu                  sync.Mutex
 	iSrv                uuid.SnowNode
 	builder             *workflow.Builder
-	taskForkService     service.RunRedoService
+	taskForkService     internalservice.RunRedoService
 	eng                 *engine2.Engine
 
-	taskRetryService service.TaskRetryService
-	//creativeDetailSvc service.CreativeDetailService
-	//videoTimelineSvc  service.VideoTimelineService
-	nodeReplaySvc  service.NodeReplayService
-	billingTaskSvc service.BillingTaskService
+	taskRetryService  internalservice.TaskRetryService
+	creativeDetailSvc service.CreativeDetailService
+	videoTimelineSvc  service.VideoTimelineService
+	nodeReplaySvc     internalservice.NodeReplayService
+	billingTaskSvc    internalservice.BillingTaskService
+	assetSigner       internalservice.StorageAssetService
 }
 
 // NewWorkflowHandler 初始化
@@ -60,9 +62,9 @@ func NewWorkflowHandler(
 	eventRepo repository2.EventRepository,
 	nodeRuntimeRepo repository2.NodeRuntimeRepository,
 	builder *workflow.Builder,
-	taskForkService service.RunRedoService,
-	taskRetryService service.TaskRetryService,
-	billingTaskSvc service.BillingTaskService,
+	taskForkService internalservice.RunRedoService,
+	taskRetryService internalservice.TaskRetryService,
+	billingTaskSvc internalservice.BillingTaskService,
 	eng *engine2.Engine,
 ) *WorkflowHandler {
 
@@ -82,7 +84,22 @@ func NewWorkflowHandler(
 	}
 }
 
-func (h *WorkflowHandler) WithNodeReplayService(nodeReplaySvc service.NodeReplayService) *WorkflowHandler {
+func (h *WorkflowHandler) WithAssetSigner(assetSigner internalservice.StorageAssetService) *WorkflowHandler {
+	h.assetSigner = assetSigner
+	return h
+}
+
+func (h *WorkflowHandler) WithCreativeDetailService(creativeDetailSvc service.CreativeDetailService) *WorkflowHandler {
+	h.creativeDetailSvc = creativeDetailSvc
+	return h
+}
+
+func (h *WorkflowHandler) WithVideoTimelineService(videoTimelineSvc service.VideoTimelineService) *WorkflowHandler {
+	h.videoTimelineSvc = videoTimelineSvc
+	return h
+}
+
+func (h *WorkflowHandler) WithNodeReplayService(nodeReplaySvc internalservice.NodeReplayService) *WorkflowHandler {
 	h.nodeReplaySvc = nodeReplaySvc
 	return h
 }
@@ -249,63 +266,63 @@ func (h *WorkflowHandler) GetTask(c *gin.Context) {
 	})
 }
 
-//func (h *WorkflowHandler) GetTaskCreativeDetail(c *gin.Context) {
-//	taskID, ok := h.parseTaskID(c)
-//	if !ok {
-//		return
-//	}
-//	if h.creativeDetailSvc == nil {
-//		response.Error(c, http.StatusServiceUnavailable, "creative detail service unavailable")
-//		return
-//	}
-//
-//	ctx := c.Request.Context()
-//	task, err := h.taskRepo.GetByID(ctx, taskID)
-//	if err != nil || task == nil {
-//		response.Error(c, http.StatusBadRequest, "task not found")
-//		return
-//	}
-//	if !h.canAccessTask(c, task) {
-//		response.Error(c, http.StatusForbidden, "forbidden")
-//		return
-//	}
-//
-//	detail, err := h.creativeDetailSvc.BuildTaskCreativeDetail(ctx, taskID)
-//	if err != nil {
-//		response.Error(c, http.StatusBadRequest, err.Error())
-//		return
-//	}
-//	response.Success(c, detail)
-//}
-//
-//func (h *WorkflowHandler) GetTaskVideoTimeline(c *gin.Context) {
-//	taskID, ok := h.parseTaskID(c)
-//	if !ok {
-//		return
-//	}
-//	if h.videoTimelineSvc == nil {
-//		response.Error(c, http.StatusServiceUnavailable, "video timeline service unavailable")
-//		return
-//	}
-//
-//	ctx := c.Request.Context()
-//	task, err := h.taskRepo.GetByID(ctx, taskID)
-//	if err != nil || task == nil {
-//		response.Error(c, http.StatusBadRequest, "task not found")
-//		return
-//	}
-//	if !h.canAccessTask(c, task) {
-//		response.Error(c, http.StatusForbidden, "forbidden")
-//		return
-//	}
-//
-//	timeline, err := h.videoTimelineSvc.BuildTaskVideoTimeline(ctx, taskID)
-//	if err != nil {
-//		response.Error(c, http.StatusBadRequest, err.Error())
-//		return
-//	}
-//	response.Success(c, timeline)
-//}
+func (h *WorkflowHandler) GetTaskCreativeDetail(c *gin.Context) {
+	taskID, ok := h.parseTaskID(c)
+	if !ok {
+		return
+	}
+	if h.creativeDetailSvc == nil {
+		response.Error(c, http.StatusServiceUnavailable, "creative detail service unavailable")
+		return
+	}
+
+	ctx := c.Request.Context()
+	task, err := h.taskRepo.GetByID(ctx, taskID)
+	if err != nil || task == nil {
+		response.Error(c, http.StatusBadRequest, "task not found")
+		return
+	}
+	if !h.canAccessTask(c, task) {
+		response.Error(c, http.StatusForbidden, "forbidden")
+		return
+	}
+
+	detail, err := h.creativeDetailSvc.BuildTaskCreativeDetail(ctx, taskID)
+	if err != nil {
+		response.Error(c, http.StatusBadRequest, err.Error())
+		return
+	}
+	response.Success(c, detail)
+}
+
+func (h *WorkflowHandler) GetTaskVideoTimeline(c *gin.Context) {
+	taskID, ok := h.parseTaskID(c)
+	if !ok {
+		return
+	}
+	if h.videoTimelineSvc == nil {
+		response.Error(c, http.StatusServiceUnavailable, "video timeline service unavailable")
+		return
+	}
+
+	ctx := c.Request.Context()
+	task, err := h.taskRepo.GetByID(ctx, taskID)
+	if err != nil || task == nil {
+		response.Error(c, http.StatusBadRequest, "task not found")
+		return
+	}
+	if !h.canAccessTask(c, task) {
+		response.Error(c, http.StatusForbidden, "forbidden")
+		return
+	}
+
+	timeline, err := h.videoTimelineSvc.BuildTaskVideoTimeline(ctx, taskID)
+	if err != nil {
+		response.Error(c, http.StatusBadRequest, err.Error())
+		return
+	}
+	response.Success(c, timeline)
+}
 
 func (h *WorkflowHandler) ReplayTaskNodeInput(c *gin.Context) {
 	h.replayTaskNode(c, false)
@@ -550,12 +567,12 @@ func (h *WorkflowHandler) CreateTaskFromWorkflow(c *gin.Context) {
 		response.Error(c, http.StatusInternalServerError, err.Error())
 		return
 	}
-	//if h.assetSigner != nil {
-	//	if err := h.assetSigner.RegisterTaskInputAssetRefs(c.Request.Context(), task.UserID, task.ID, req.Input); err != nil {
-	//		response.Error(c, http.StatusInternalServerError, err.Error())
-	//		return
-	//	}
-	//}
+	if h.assetSigner != nil {
+		if err := h.assetSigner.RegisterTaskInputAssetRefs(c.Request.Context(), task.UserID, task.ID, req.Input); err != nil {
+			response.Error(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+	}
 
 	err = h.taskRepo.Enqueue(c.Request.Context(), task.ID)
 	if err != nil {
@@ -656,7 +673,7 @@ func (h *WorkflowHandler) ResumeTask(c *gin.Context) {
 			childPatches := h.toDomainRuntimePatches(cr.Patches)
 			childResumeFrom := strings.TrimSpace(cr.ResumeFrom)
 
-			if err := h.taskRetryService.PrepareTaskRetry(ctx, cr.ChildTaskID, service.RetryTriggerManual, childResumeFrom, childPatches); err != nil {
+			if err := h.taskRetryService.PrepareTaskRetry(ctx, cr.ChildTaskID, internalservice.RetryTriggerManual, childResumeFrom, childPatches); err != nil {
 				response.Error(c, http.StatusInternalServerError, fmt.Sprintf("child_resumes[%d]: prepare retry failed: %v", i, err))
 				return
 			}
@@ -675,25 +692,25 @@ func (h *WorkflowHandler) ResumeTask(c *gin.Context) {
 
 	patches := h.toDomainRuntimePatches(req.Patches)
 
-	//if h.billingTaskSvc != nil {
-	//	if err := h.billingTaskSvc.RefreezeTask(ctx, task.ID); err != nil {
-	//		response.Error(c, billingResumeErrorStatus(err), err.Error())
-	//		return
-	//	}
-	//	if err := h.billingTaskSvc.AssertTaskResumable(ctx, task.ID); err != nil {
-	//		response.Error(c, billingResumeErrorStatus(err), err.Error())
-	//		return
-	//	}
-	//}
+	if h.billingTaskSvc != nil {
+		if err := h.billingTaskSvc.RefreezeTask(ctx, task.ID); err != nil {
+			response.Error(c, billingResumeErrorStatus(err), err.Error())
+			return
+		}
+		if err := h.billingTaskSvc.AssertTaskResumable(ctx, task.ID); err != nil {
+			response.Error(c, billingResumeErrorStatus(err), err.Error())
+			return
+		}
+	}
 	err = h.taskRetryService.PrepareTaskRetry(
 		ctx,
 		task.ID,
-		service.RetryTriggerManual,
+		internalservice.RetryTriggerManual,
 		resumeFrom,
 		patches,
 	)
 	if err != nil {
-		if err.Error() == service.TaskNoRetryFound && (task.Status == domain.TaskFailed || task.Status == domain.TaskCanceled) {
+		if err.Error() == internalservice.TaskNoRetryFound && (task.Status == domain.TaskFailed || task.Status == domain.TaskCanceled) {
 			task.Status = domain.TaskPending
 			_ = h.taskRepo.Update(ctx, task)
 			_ = h.taskRepo.Enqueue(ctx, task.ID)
@@ -722,12 +739,12 @@ func (h *WorkflowHandler) ResumeTask(c *gin.Context) {
 	})
 }
 
-//func billingResumeErrorStatus(err error) int {
-//	if err == internalservice.ErrBillingInsufficientPoints {
-//		return http.StatusPaymentRequired
-//	}
-//	return http.StatusInternalServerError
-//}
+func billingResumeErrorStatus(err error) int {
+	if err == internalservice.ErrBillingInsufficientPoints {
+		return http.StatusPaymentRequired
+	}
+	return http.StatusInternalServerError
+}
 
 func isRecentlyClaimed(task *domain.Task, now time.Time) bool {
 	if task == nil || task.WorkerID == "" || task.StartedAt.IsZero() {
@@ -764,12 +781,12 @@ func (h *WorkflowHandler) CancelTask(c *gin.Context) {
 			response.Error(c, http.StatusBadRequest, "task is too recent to cancel, please wait at least 1 minute")
 			return
 		}
-		//if h.billingTaskSvc != nil {
-		//	if err := h.billingTaskSvc.CancelTaskFreeze(ctx, task.ID, "user canceled pending task"); err != nil {
-		//		response.Error(c, http.StatusInternalServerError, err.Error())
-		//		return
-		//	}
-		//}
+		if h.billingTaskSvc != nil {
+			if err := h.billingTaskSvc.CancelTaskFreeze(ctx, task.ID, "user canceled pending task"); err != nil {
+				response.Error(c, http.StatusInternalServerError, err.Error())
+				return
+			}
+		}
 		reason = "user canceled pending task"
 
 	case domain.TaskRunning:
@@ -782,13 +799,13 @@ func (h *WorkflowHandler) CancelTask(c *gin.Context) {
 			response.Error(c, http.StatusBadRequest, "task is still active, cannot cancel")
 			return
 		}
-		//if h.billingTaskSvc != nil {
-		//	if err := h.billingTaskSvc.RefundTask(ctx, task.ID, "user canceled running task"); err != nil {
-		//		response.Error(c, http.StatusInternalServerError, err.Error())
-		//		return
-		//	}
-		//}
-		//reason = "user canceled running task"
+		if h.billingTaskSvc != nil {
+			if err := h.billingTaskSvc.RefundTask(ctx, task.ID, "user canceled running task"); err != nil {
+				response.Error(c, http.StatusInternalServerError, err.Error())
+				return
+			}
+		}
+		reason = "user canceled running task"
 
 	case domain.TaskSuspended:
 		alive, err := h.isAnyNodeAlive(ctx, task.ID)
@@ -804,13 +821,13 @@ func (h *WorkflowHandler) CancelTask(c *gin.Context) {
 			response.Error(c, http.StatusBadRequest, "task suspended recently, please wait at least 15 minutes before canceling")
 			return
 		}
-		//if h.billingTaskSvc != nil {
-		//	if err := h.billingTaskSvc.RefundTask(ctx, task.ID, "user canceled suspended task"); err != nil {
-		//		response.Error(c, http.StatusInternalServerError, err.Error())
-		//		return
-		//	}
-		//}
-		//reason = "user canceled suspended task"
+		if h.billingTaskSvc != nil {
+			if err := h.billingTaskSvc.RefundTask(ctx, task.ID, "user canceled suspended task"); err != nil {
+				response.Error(c, http.StatusInternalServerError, err.Error())
+				return
+			}
+		}
+		reason = "user canceled suspended task"
 
 	default:
 		response.Error(c, http.StatusBadRequest, fmt.Sprintf("task status %s cannot be canceled", task.Status))
@@ -1317,13 +1334,13 @@ func (h *WorkflowHandler) GetUserNodeDefinitionData(c *gin.Context) {
 	}
 
 	output := rt.Output
-	//if h.assetSigner != nil {
-	//	out := h.assetSigner.SignURLsInValue(ctx, task.UserID, output)
-	//	out = h.assetSigner.HydrateAssetRefs(ctx, task.UserID, out)
-	//	if signed, ok := out.(map[string]any); ok {
-	//		output = signed
-	//	}
-	//}
+	if h.assetSigner != nil {
+		out := h.assetSigner.SignURLsInValue(ctx, task.UserID, output)
+		out = h.assetSigner.HydrateAssetRefs(ctx, task.UserID, out)
+		if signed, ok := out.(map[string]any); ok {
+			output = signed
+		}
+	}
 	response.Success(c, dto.UserNodeDataDTO{
 		Name:  rt.Name,
 		Label: label,
@@ -1364,13 +1381,13 @@ func (h *WorkflowHandler) GetUserNodeRuntimeData(c *gin.Context) {
 		return
 	}
 	output := rt.Output
-	//if h.assetSigner != nil {
-	//	out := h.assetSigner.SignURLsInValue(ctx, task.UserID, output)
-	//	out = h.assetSigner.HydrateAssetRefs(ctx, task.UserID, out)
-	//	if signed, ok := out.(map[string]any); ok {
-	//		output = signed
-	//	}
-	//}
+	if h.assetSigner != nil {
+		out := h.assetSigner.SignURLsInValue(ctx, task.UserID, output)
+		out = h.assetSigner.HydrateAssetRefs(ctx, task.UserID, out)
+		if signed, ok := out.(map[string]any); ok {
+			output = signed
+		}
+	}
 
 	response.Success(c, gin.H{
 		"name":           rt.Name,

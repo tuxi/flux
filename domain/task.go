@@ -130,15 +130,15 @@ type Task struct {
 
 // TaskOutput 最终结果层 (给客户端的 final Response)
 type TaskOutput struct {
-	ResultType     string         `json:"result_type"`
-	PrimaryFileUrl string         `json:"primary_file_url"`
-	CoverUrl       *string        `json:"cover_url,omitempty"`
-	PreviewUrl     *string        `json:"preview_url,omitempty"`
-	Width          *int64         `json:"width,omitempty"`    // 像素用整数
-	Height         *int64         `json:"height,omitempty"`   // 像素用整数
-	Duration       *float64       `json:"duration,omitempty"` // 时长用浮点数（秒）
-	Extras         map[string]any `json:"extras,omitempty"`   // 扩展
-	//CreativeDetail *CreativeDetail `json:"creative_detail,omitempty"` // 创意详情
+	ResultType     string          `json:"result_type"`
+	PrimaryFileUrl string          `json:"primary_file_url"`
+	CoverUrl       *string         `json:"cover_url,omitempty"`
+	PreviewUrl     *string         `json:"preview_url,omitempty"`
+	Width          *int64          `json:"width,omitempty"`           // 像素用整数
+	Height         *int64          `json:"height,omitempty"`          // 像素用整数
+	Duration       *float64        `json:"duration,omitempty"`        // 时长用浮点数（秒）
+	Extras         map[string]any  `json:"extras,omitempty"`          // 扩展
+	CreativeDetail *CreativeDetail `json:"creative_detail,omitempty"` // 创意详情
 }
 
 func ParseFinal(outputJSON []byte) (*TaskOutput, error) {
