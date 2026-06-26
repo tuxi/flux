@@ -34,6 +34,7 @@ import (
 	"flux/planner"
 	"flux/runtime"
 	"flux/session"
+	"flux/skill"
 	"flux/tool"
 	"flux/tool/builtin"
 )
@@ -99,14 +100,63 @@ func main() {
 		fail("注册 MCP 工具失败: " + err.Error())
 	}
 
+	// ── Skill Runtime 接入 ──
+	// 把 ./skills 和 ~/.flux/skills 下的 SKILL.md 变成 agent 可选的工具。
+	// planner 看到的还是统一的 ToolDefinition——底层是 tool/workflow/agent 它不关心。
+	skillRoots := skill.DefaultRoots()
+	loader := skill.NewLoader(skillRoots...)
+	resolver := skill.NewResolver(func(name string) (tool.Tool, error) {
+		if t, ok := reg.Get(name); ok {
+			return t, nil
+		}
+		return nil, fmt.Errorf("skill 引用的工具 %q 未注册", name)
+	})
+	// WorkflowSkill 的执行入口。S3 之前先放观察桩：planner 一旦选中 workflow skill，
+	// trace 里会出现这条——那就是产品逼出 S3（engine.Run）的真实信号，而不是预先写死。
+	skillRunner := func(_ context.Context, spec *skill.SkillSpec, _ map[string]any) (*tool.Result, error) {
+		return tool.Fail(fmt.Errorf("workflow skill %q 尚未接入引擎执行（S3 待办）", spec.Name)), nil
+	}
+	skillReg := skill.NewRegistry()
+	_, _ = skill.LoadAndRegister(ctx, loader, resolver, skillReg)
+	if err := skill.RegisterAsTools(skillReg, reg, skillRunner); err != nil {
+		fmt.Printf("（部分 skill 未能注册为工具：%v）\n", err)
+	}
+
+	// save_as_skill：agent 跑通后把 DAG 固化成新 skill。固化到第一个 root（项目级 ./skills）。
+	saveDir := skillRoots[0]
+	if abs, err := filepath.Abs(saveDir); err == nil {
+		saveDir = abs
+	}
+	saveTool := skill.NewSaveAsSkillTool(saveDir)
+	reg.Register(saveTool)
+
+	allTools := reg.List()
+	builtinCount := 3 + len(mcpNames) + 1 // read_file+shell+grep + N MCP + save_as_skill
+	skillCount := len(allTools) - builtinCount
 	fmt.Printf("flux-agent | model=%s | repo=%s\n", *modelName, repoDir)
-	fmt.Printf("工具：read_file + shell + grep + %d 个 MCP filesystem 工具\n", len(mcpNames))
+	fmt.Printf("工具菜单：%d 个（%d builtin + %d skill）", len(allTools), builtinCount, skillCount)
+	if skillCount > 0 {
+		fmt.Printf(" — skill 已进入决策菜单 ✅")
+	}
+	fmt.Println()
 	fmt.Printf("目标：%s\n", goal)
 	fmt.Println("──────────────────────────────────────────")
 
 	// ── planner + 实时 observability ──
 	p := planner.NewLLMPlanner(model.NewOpenAICompatibleProvider(*baseURL, apiKey), *modelName, goal, reg)
 	p.MaxRounds = *maxRounds
+
+	// 进化闭环：save_as_skill 成功后，重新加载并把新 skill 注册进 reg，
+	// 再刷新 planner 的工具快照——使同一会话内 agent 立刻能复用刚固化的 skill。
+	saveTool.OnSave = func(name string) {
+		fresh := skill.NewRegistry()
+		skill.LoadAndRegister(ctx, loader, resolver, fresh)
+		if err := skill.RegisterAsTools(fresh, reg, skillRunner); err != nil {
+			fmt.Printf("（新 skill 重注册部分失败：%v）\n", err)
+		}
+		p.RefreshTools()
+		fmt.Printf("🌱 新 skill 已固化并上线，本会话即可复用：%s\n", name)
+	}
 
 	// 会话持久化：通过 session.Store 端口（单机 = FileStore，服务端 = Postgres）。
 	sessStore := session.NewFileStore(filepath.Join(homeDir(), ".flux-agent", "sessions"))

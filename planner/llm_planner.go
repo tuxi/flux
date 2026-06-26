@@ -83,6 +83,13 @@ func NewLLMPlanner(provider model.Completer, modelName, goal string, reg *tool.R
 	}
 }
 
+// RefreshTools 重新从 registry 构建工具快照。
+// 运行期注册了新工具时调用（如 save_as_skill 把 DAG 固化成新 skill 后），
+// 使下一轮规划能看到它们——否则 planner 用的是构造时的快照，看不到新工具。
+func (p *LLMPlanner) RefreshTools() {
+	p.tools = append(buildToolDefinitions(p.registry), giveUpTool)
+}
+
 const defaultSystemPrompt = `You are an autonomous agent that completes a goal by calling tools.
 
 Iterate: examine prior tool results, call the next tool you need, observe its output, and continue.

@@ -24,13 +24,13 @@ func RegisterAsTools(skillReg *Registry, toolReg *tool.Registry, runner Workflow
 
 // AsTool 把 ExecutableSkill 转成 tool.Tool。
 //
-//   - ToolSkill      → 直接返回包装的 tool.Tool
+//   - ToolSkill      → ToolSkill 自身就是 tool.Tool（Name() 返回 skill 名，其余委托给底层工具）
 //   - WorkflowSkill  → 包成 SubWorkflowTool（内部走 WorkflowRunner）
 //   - AgentSkill     → S4 前不支持执行，返回 error
 func AsTool(exe ExecutableSkill, runner WorkflowRunner) (tool.Tool, error) {
 	switch s := exe.(type) {
 	case *ToolSkill:
-		return s.Tool, nil
+		return s, nil // ToolSkill 已实现 tool.Tool
 	case *WorkflowSkill:
 		spec := &SkillSpec{
 			Name:           s.Def.Name,

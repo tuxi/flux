@@ -42,8 +42,13 @@ func TestResolve_ToolSkill(t *testing.T) {
 		t.Fatalf("want *ToolSkill, got %T", exe)
 	}
 	def := ts.Definition()
-	if def.Name != "merge_result" {
-		t.Fatalf("name: want merge_result, got %q", def.Name)
+	if def.Name != "merge" {
+		t.Fatalf("name: want merge (skill name), got %q", def.Name)
+	}
+	// 委托给底层工具，Execute 应成功
+	res, err := ts.Execute(context.Background(), map[string]any{"x": 1}, nil)
+	if err != nil || !res.Success {
+		t.Fatalf("ToolSkill 应能委托执行给底层工具: %v", err)
 	}
 }
 

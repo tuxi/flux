@@ -16,15 +16,33 @@ type ExecutableSkill interface {
 	Definition() tool.ToolDefinition
 }
 
-// ── ToolSkill：直接包装一个 tool.Tool ──
+// ── ToolSkill：包装一个 tool.Tool，对外以 skill 名出现 ──
 
-type ToolSkill struct{ Tool tool.Tool }
+// ToolSkill 包装一个现有的 tool.Tool，但以 skill 名暴露（Name() 返回 skill 名而非工具名）。
+// 其余方法（Description/InputSchema/Execute/Mode）全部委托给底层工具。
+// 这样 planner 看到的是 "list_files" 而不是底下的 "shell"。
+type ToolSkill struct {
+	SkillName string    // skill 名（来自 SKILL.md）
+	Tool      tool.Tool // 底层工具
+}
+
+func (s *ToolSkill) Name() string             { return s.SkillName }
+func (s *ToolSkill) Description() string       { return s.Tool.Description() }
+func (s *ToolSkill) Mode() tool.ExecutionMode  { return s.Tool.Mode() }
+func (s *ToolSkill) InputSchema() tool.DataSchema  { return s.Tool.InputSchema() }
+func (s *ToolSkill) OutputSchema() tool.DataSchema { return s.Tool.OutputSchema() }
+func (s *ToolSkill) Execute(ctx context.Context, input map[string]any, emitter tool.ToolEmitter) (*tool.Result, error) {
+	return s.Tool.Execute(ctx, input, emitter)
+}
 
 func (s *ToolSkill) Definition() tool.ToolDefinition {
-	return tool.DefinitionOf(s.Tool)
+	def := tool.DefinitionOf(s.Tool)
+	def.Name = s.SkillName
+	return def
 }
 
 var _ ExecutableSkill = (*ToolSkill)(nil)
+var _ tool.Tool = (*ToolSkill)(nil)
 
 // ── WorkflowSkill：持有一个 workflow 引用（路径或 DB id），执行时再编译 ──
 
@@ -32,8 +50,8 @@ var _ ExecutableSkill = (*ToolSkill)(nil)
 // 原因：skill 是能力引用，不是已编译执行体。未来 workflow 可能来自
 // DB(workflow_versions)、OSSURL、Git repo 的 workflow.yaml——引用解耦加载。
 type WorkflowSkill struct {
-	Def          tool.ToolDefinition
-	WorkflowRef  string // 路径（相对 skill 目录）或 DB id 等引用——执行时再编译
+	Def         tool.ToolDefinition
+	WorkflowRef string // 路径（相对 skill 目录）或 DB id 等引用——执行时再编译
 }
 
 func (s *WorkflowSkill) Definition() tool.ToolDefinition { return s.Def }
@@ -76,7 +94,7 @@ func (r *Resolver) Resolve(spec *SkillSpec) (ExecutableSkill, error) {
 		if err != nil {
 			return nil, err
 		}
-		return &ToolSkill{Tool: t}, nil
+		return &ToolSkill{SkillName: spec.Name, Tool: t}, nil
 
 	case ImplWorkflow:
 		return &WorkflowSkill{Def: def, WorkflowRef: spec.Workflow}, nil
@@ -91,7 +109,7 @@ func (r *Resolver) Resolve(spec *SkillSpec) (ExecutableSkill, error) {
 		if err != nil {
 			return nil, err
 		}
-		return &ToolSkill{Tool: t}, nil
+		return &ToolSkill{SkillName: spec.Name, Tool: t}, nil
 	}
 }
 
@@ -99,11 +117,11 @@ func (r *Resolver) Resolve(spec *SkillSpec) (ExecutableSkill, error) {
 // planner 据此决定调该 skill 时该传什么——不再靠自然语言猜参数。
 func specToDefinition(spec *SkillSpec) tool.ToolDefinition {
 	return tool.ToolDefinition{
-		Name:         spec.Name,
-		Description:  spec.Description,
-		InputSchema:  inputsToJSONSchema(spec.Inputs),
+		Name:        spec.Name,
+		Description: spec.Description,
+		InputSchema: inputsToJSONSchema(spec.Inputs),
 		OutputSchema: nil,
-		Annotations:  tool.Annotations{},
+		Annotations: tool.Annotations{},
 	}
 }
 

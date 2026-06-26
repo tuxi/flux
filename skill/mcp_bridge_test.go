@@ -13,14 +13,15 @@ func TestAsTool_ToolSkillIsDirectPassThrough(t *testing.T) {
 	reg := tool.NewRegistry()
 	reg.Register(builtin.NewMergeResultTool())
 
-	tl, err := skill.AsTool(&skill.ToolSkill{Tool: builtin.NewMergeResultTool()}, nil)
+	// ToolSkill 现在以 skill 名对外暴露（Name() 返回 skill 名）
+	tl, err := skill.AsTool(&skill.ToolSkill{SkillName: "my_skill", Tool: builtin.NewMergeResultTool()}, nil)
 	if err != nil {
 		t.Fatalf("AsTool: %v", err)
 	}
-	if tl.Name() != "merge_result" {
-		t.Fatalf("name: got %q", tl.Name())
+	if tl.Name() != "my_skill" {
+		t.Fatalf("name: want my_skill, got %q", tl.Name())
 	}
-	// 直接可执行
+	// 执行仍委托给底层工具
 	res, err := tl.Execute(context.Background(), map[string]any{"x": 1}, nil)
 	if err != nil || !res.Success {
 		t.Fatalf("execute: %v", err)
