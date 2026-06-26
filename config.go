@@ -59,8 +59,9 @@ const (
 
 // RunRequest 是一次执行请求。
 type RunRequest struct {
-	Asset string         // 已注册的 Asset 名
-	Input map[string]any // 任务输入
+	Asset  string         // 已注册的 Asset 名
+	Input  map[string]any // 任务输入
+	TaskID string         // 可选：宿主已有的 task ID（如 DreamAI 的 Task.ID）。为空则自动生成
 }
 
 // RunResult 是一次执行的结果。

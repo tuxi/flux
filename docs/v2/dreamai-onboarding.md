@@ -221,8 +221,9 @@ result := e.RunWithResult(ctx, task, def)
 
 ```go
 result, err := engine.Run(ctx, flux.RunRequest{
-    Asset: "goods_video_pro_v3",
-    Input: taskInput,
+    Asset:  "goods_video_pro_v3",
+    Input:  taskInput,
+    TaskID: strconv.FormatInt(task.ID, 10), // 传入 DreamAI 已创建的 Task.ID
 })
 
 switch result.Status {

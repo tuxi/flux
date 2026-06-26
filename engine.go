@@ -69,10 +69,13 @@ func (e *Engine) Run(ctx context.Context, req RunRequest) (*RunResult, error) {
 		return &RunResult{Status: StatusFailed, TaskID: req.Asset}, nil
 	}
 
-	// 分配 taskID（Phase 2: 雪花 ID）
-	e.mu.Lock()
-	taskID := fmt.Sprintf("%s_%d", req.Asset, len(e.tasks)+1)
-	e.mu.Unlock()
+	// 使用宿主提供的 taskID，没有则自动生成
+	taskID := req.TaskID
+	if taskID == "" {
+		e.mu.Lock()
+		taskID = fmt.Sprintf("%s_%d", req.Asset, len(e.tasks)+1)
+		e.mu.Unlock()
+	}
 
 	plan, err := workflow.Compile(def, func(toolName string) bool {
 		t, ok := e.toolReg.Get(toolName)

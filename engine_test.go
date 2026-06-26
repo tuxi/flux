@@ -312,3 +312,44 @@ func TestEngine_Notify_Idempotent(t *testing.T) {
 
 	t.Log("✅ 幂等：重复 Notify 安全，CompleteAwait 拒绝第二次 claim")
 }
+
+// ── 测试：宿主提供的 TaskID 被正确使用 ──
+
+func TestEngine_Run_UsesProvidedTaskID(t *testing.T) {
+	backend := newMemBackend()
+	engine, _ := flux.New(flux.Config{Backend: backend})
+
+	def := &definition.WorkflowDefinition{
+		Name: "test_taskid",
+		Nodes: []definition.NodeDefinition{
+			{Name: "start", Type: definition.NodeStart},
+			{Name: "echo", Type: definition.NodeTool, Config: map[string]any{"tool": "echo"}},
+			{Name: "end", Type: definition.NodeEnd},
+		},
+		Edges: []definition.EdgeDefinition{
+			{From: "start", To: "echo", Type: definition.EdgeNormal},
+			{From: "echo", To: "end", Type: definition.EdgeNormal},
+		},
+	}
+
+	engine.Register(flux.Workflow(def))
+	engine.Register(flux.Tool(echoTool{}))
+
+	// 用宿主提供的 TaskID（如 DreamAI 的 Task.ID）
+	result, _ := engine.Run(context.Background(), flux.RunRequest{
+		Asset:  "test_taskid",
+		Input:  map[string]any{},
+		TaskID: "20260626_DreamAI_Task_789",
+	})
+
+	if result.TaskID != "20260626_DreamAI_Task_789" {
+		t.Fatalf("应使用宿主提供的 TaskID，实际=%q", result.TaskID)
+	}
+
+	// 验证 Backend 用的是这个 TaskID
+	_, ok := backend.nodes["20260626_DreamAI_Task_789.echo"]
+	if !ok {
+		t.Fatal("PersistNode 应用宿主提供的 TaskID")
+	}
+	t.Logf("✅ TaskID 透传：%s", result.TaskID)
+}

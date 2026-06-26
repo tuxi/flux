@@ -125,7 +125,7 @@ func (r *nodeRuntimeRepository) FindByTaskID(ctx context.Context, taskID int64) 
 
 	err := r.db.WithContext(ctx).
 		Where("task_id = ?", taskID).
-		Order("index asc, id asc").
+		Order("`index` asc, id asc").
 		Find(&models).Error
 
 	if err != nil {
