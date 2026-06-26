@@ -353,3 +353,58 @@ func TestEngine_Run_UsesProvidedTaskID(t *testing.T) {
 	}
 	t.Logf("✅ TaskID 透传：%s", result.TaskID)
 }
+
+// ── 测试：realProviderTaskID 从 input 提取真实外部 job ID ──
+
+func TestEngine_Notify_UsesRealProviderTaskID(t *testing.T) {
+	backend := newMemBackend()
+	engine, _ := flux.New(flux.Config{Backend: backend})
+
+	// job_id 从 input 传入（业务层已知道 provider 返回的 job_id）
+	def := &definition.WorkflowDefinition{
+		Name: "test_real_jobid",
+		Nodes: []definition.NodeDefinition{
+			{Name: "start", Type: definition.NodeStart},
+			{
+				Name: "tts_wait",
+				Type: definition.NodeAwait,
+				Config: map[string]any{
+					"await_type": "external_task",
+					"source":     "webhook_or_poll",
+				},
+				InputMapping: map[string]string{"job_id": "input.job_id"},
+			},
+			{Name: "echo", Type: definition.NodeTool, Config: map[string]any{"tool": "echo"}},
+			{Name: "end", Type: definition.NodeEnd},
+		},
+		Edges: []definition.EdgeDefinition{
+			{From: "start", To: "tts_wait", Type: definition.EdgeNormal},
+			{From: "tts_wait", To: "echo", Type: definition.EdgeNormal},
+			{From: "echo", To: "end", Type: definition.EdgeNormal},
+		},
+	}
+
+	engine.Register(flux.Workflow(def))
+	engine.Register(flux.Tool(echoTool{}))
+
+	result, _ := engine.Run(context.Background(), flux.RunRequest{
+		Asset:  "test_real_jobid",
+		Input:  map[string]any{"job_id": "real_provider_job_67890"},
+		TaskID: "88",
+	})
+	if result.Status != flux.StatusSuspended {
+		t.Fatalf("应挂起，status=%d", result.Status)
+	}
+
+	// 模拟真实 webhook：ProviderTaskID 匹配真实 job_id
+	_, err := engine.Notify(context.Background(), flux.Event{
+		Provider:       "tts",
+		ProviderTaskID: "real_provider_job_67890",
+		Output:         map[string]any{"audio_url": "https://cdn.example.com/audio.mp3"},
+	})
+	if err != nil {
+		t.Fatalf("用真实 job_id Notify 应成功: %v", err)
+	}
+
+	t.Log("✅ 真实 job_id 提取：input.job_id → Begin 识别 → Notify 匹配")
+}

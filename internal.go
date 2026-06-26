@@ -36,8 +36,12 @@ type internalAwait struct {
 }
 
 func (a *internalAwait) Begin(ctx context.Context, node *runtime.PlanNode, input map[string]any) (int64, error) {
-	// 生成 providerTaskID（Phase 2: 由外部 Provider 返回真实 ID）
-	providerTaskID := a.taskID + "_" + node.Name
+	// 从 input 中提取真实的外部 job ID（TTS → job_id，图片 → task_id，通用 → provider_task_id）
+	providerTaskID := realProviderTaskID(input)
+	if providerTaskID == "" {
+		// 兜底：无真实 ID 时自生成（sync workflow 的虚拟 async 节点）
+		providerTaskID = a.taskID + "_" + node.Name
+	}
 
 	bindingID, err := a.backend.CreateAwait(ctx, a.taskID, node.Name, providerTaskID, input)
 	if err != nil {
@@ -66,3 +70,14 @@ func (s *internalStore) PersistNode(ctx context.Context, node string, state runt
 var _ runtime.Invoker = (*internalInvoker)(nil)
 var _ runtime.AwaitController = (*internalAwait)(nil)
 var _ runtime.Store = (*internalStore)(nil)
+
+// realProviderTaskID 从 resolved input 中提取外部 Provider 返回的真实任务 ID。
+// 不同 Provider 用的字段名不同：TTS → job_id，图片/视频 → task_id，通用 → provider_task_id。
+func realProviderTaskID(input map[string]any) string {
+	for _, key := range []string{"provider_task_id", "job_id", "task_id"} {
+		if v, ok := input[key].(string); ok && v != "" {
+			return v
+		}
+	}
+	return ""
+}
