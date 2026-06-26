@@ -59,6 +59,15 @@ func (s *Scheduler) WithMaxSteps(n int) *Scheduler {
 	return s
 }
 
+// WithPlan 预载入已编译好的计划（crash 恢复用）。
+// 恢复后的 scheduler 已有完整 plan，Run/Resume 时 src.Next 产出的已知节点会被跳过，
+// 从而不会把已恢复的 NodeSuccess 覆写成 NodePending。
+// additive：不改 NewScheduler/Run 签名。
+func (s *Scheduler) WithPlan(p *Plan) *Scheduler {
+	s.plan = p
+	return s
+}
+
 // Run 驱动一次（可恢复的）执行。返回 Suspended 时，外部事件到达后调用 Resume 再次进入。
 func (s *Scheduler) Run(ctx context.Context, src PlanSource, state ExecState) (Result, error) {
 	steps := 0
