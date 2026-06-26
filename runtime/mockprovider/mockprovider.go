@@ -20,6 +20,13 @@ import (
 	"time"
 )
 
+// TaskBehavior 控制单个 task 的行为（B-M2：不同分支不同命运）。
+type TaskBehavior struct {
+	ResultStatus string         // "done" 或 "failed"
+	Result       map[string]any // 完成时的结果（仅 done）
+	Duration     time.Duration  // 覆盖全局 ProcessTime
+}
+
 // Provider 是一个可控的异步任务模拟器。
 type Provider struct {
 	mu    sync.Mutex
@@ -31,6 +38,9 @@ type Provider struct {
 	ProcessTime time.Duration
 	// ShouldFail 控制 /poll 是否返回错误
 	ShouldFail bool
+
+	// behaviors 按 taskID 配置行为（B-M2 fanout：不同分支不同命运）
+	behaviors map[string]TaskBehavior
 }
 
 // Task 表示一个已提交的异步任务。
@@ -43,11 +53,22 @@ type Task struct {
 	DoneAt    time.Time      `json:"done_at,omitempty"`
 }
 
-// New 创建 Provider。processTime 是 submit 后任务变为 done 的耗时。
+// New 创建 Provider。processTime 是 submit 后任务变为 done 的默认耗时。
 func New(processTime time.Duration) *Provider {
 	return &Provider{
-		tasks:       map[string]*Task{},
+		tasks:      map[string]*Task{},
+		behaviors:  map[string]TaskBehavior{},
 		ProcessTime: processTime,
+	}
+}
+
+// SetTaskBehavior 为指定 task 配置行为（submit 后调用）。
+func (p *Provider) SetTaskBehavior(taskID string, b TaskBehavior) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.behaviors[taskID] = b
+	if t, ok := p.tasks[taskID]; ok && b.Duration > 0 {
+		t.DoneAt = t.CreatedAt.Add(b.Duration)
 	}
 }
 
@@ -110,8 +131,35 @@ func (p *Provider) handlePoll(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// 检查 per-task behavior（B-M2 fanout 不同命运）
+	p.mu.Lock()
+	behavior, hasBehavior := p.behaviors[taskID]
+	p.mu.Unlock()
+
+	if hasBehavior && behavior.ResultStatus == "failed" {
+		task.Status = "failed"
+		writeJSON(w, http.StatusOK, map[string]any{
+			"task_id": task.ID,
+			"status":  "failed",
+			"error":   "simulated task failure",
+		})
+		return
+	}
+
 	// 检查是否已到完成时间
-	if time.Now().After(task.DoneAt) {
+	if hasBehavior && behavior.Duration > 0 {
+		// 用 per-task 时间判断
+		if time.Now().After(task.DoneAt) {
+			p.mu.Lock()
+			task.Status = "done"
+			if behavior.Result != nil {
+				task.Result = behavior.Result
+			} else if task.Result == nil {
+				task.Result = map[string]any{"completed": true, "output": task.Input}
+			}
+			p.mu.Unlock()
+		}
+	} else if time.Now().After(task.DoneAt) {
 		p.mu.Lock()
 		task.Status = "done"
 		if task.Result == nil {

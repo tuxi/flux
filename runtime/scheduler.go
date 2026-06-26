@@ -213,7 +213,7 @@ func (s *Scheduler) depsSatisfied(state ExecState, n *PlanNode) bool {
 		return false
 	default: // JoinAll
 		for _, d := range n.DependsOn {
-			if st := state.State(d); st != NodeSuccess && st != NodeSkipped {
+			if st := state.State(d); !st.Terminal() {
 				return false
 			}
 		}

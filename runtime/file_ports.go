@@ -3,6 +3,7 @@ package runtime
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"sync"
@@ -142,3 +143,56 @@ func SimplePlan() *Plan {
 		},
 	}
 }
+
+// ── B-M2 共享的测试夹具（fanout）──
+
+// FanoutPlan 构造 N 个并行的 async 节点 + 一个 join 节点。
+//
+//	DAG: [async_0, async_1, ..., async_N-1] → join
+//	所有 async 节点无依赖（并行提交），join 依赖所有 async（JoinAll）。
+//	join 的 Resolve 收集所有分支的输出（包括失败分支——通过 state 检查）。
+func FanoutPlan(n int) *Plan {
+	nodes := map[string]*PlanNode{}
+	depNames := make([]string, n)
+	for i := 0; i < n; i++ {
+		name := fanNodeName(i)
+		depNames[i] = name
+		idx := i // 闭包捕获
+		nodes[name] = &PlanNode{
+			Name:     name,
+			ToolName: "provider_async",
+			Async:    true,
+			Join:     JoinAll,
+			Resolve: func(_ context.Context, _ ExecState) (map[string]any, error) {
+				return map[string]any{"branch": idx, "item": "fanout"}, nil
+			},
+		}
+	}
+	nodes["join"] = &PlanNode{
+		Name:      "join",
+		ToolName:  "echo",
+		DependsOn: depNames,
+		Join:      JoinAll,
+		Resolve: func(_ context.Context, state ExecState) (map[string]any, error) {
+			// 收集所有分支状态和输出
+			results := map[string]any{}
+			for _, d := range depNames {
+				st := state.State(d)
+				out := state.Output(d)
+				results[d] = map[string]any{"state": int(st), "output": out}
+			}
+			return results, nil
+		},
+	}
+	return &Plan{Nodes: nodes}
+}
+
+func fanNodeName(i int) string {
+	return fmt.Sprintf("async_%d", i)
+}
+
+// FanNodeName 返回 fanout 中第 i 个分支的节点名（暴露给测试）。
+func FanNodeName(i int) string { return fanNodeName(i) }
+
+// FanoutPlanSource 把 FanoutPlan 包成一次性 StaticSource。
+func FanoutPlanSource(n int) PlanSource { return NewStaticSource(FanoutPlan(n)) }
