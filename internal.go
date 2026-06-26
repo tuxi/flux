@@ -74,7 +74,7 @@ var _ runtime.Store = (*internalStore)(nil)
 // realProviderTaskID 从 resolved input 中提取外部 Provider 返回的真实任务 ID。
 // 不同 Provider 用的字段名不同：TTS → job_id，图片/视频 → task_id，通用 → provider_task_id。
 func realProviderTaskID(input map[string]any) string {
-	for _, key := range []string{"provider_task_id", "job_id", "task_id"} {
+	for _, key := range []string{"provider_task_id", "job_id"} {
 		if v, ok := input[key].(string); ok && v != "" {
 			return v
 		}
