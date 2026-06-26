@@ -25,14 +25,17 @@ func NewSaveAsSkillTool(skillDir string) *SaveAsSkillTool {
 }
 
 func (t *SaveAsSkillTool) Name() string        { return "save_as_skill" }
-func (t *SaveAsSkillTool) Description() string  { return "把当前成功执行的 DAG 保存为可复用的 Skill（SKILL.md + workflow.yaml）。下次 agent 可以直接调这个 skill。" }
+func (t *SaveAsSkillTool) Description() string {
+	return "把当前成功执行的操作保存为可复用的 Skill。若提供 workflow_yaml 则存为 workflow 型，否则存为 tool 型（需指定 tool_name，如 shell）。下次 agent 可以直接调这个 skill。"
+}
 func (t *SaveAsSkillTool) Mode() tool.ExecutionMode { return tool.SyncExecution }
 
 func (t *SaveAsSkillTool) InputSchema() tool.DataSchema {
 	return tool.DataSchema{Fields: map[string]tool.FieldSchema{
-		"name":         {Type: "string", Required: true, Desc: "Skill 名称（简洁、语义化，如 generate_product_video）"},
+		"name":         {Type: "string", Required: true, Desc: "Skill 名称（简洁、语义化，如 list_dir）"},
 		"description":  {Type: "string", Required: true, Desc: "Skill 描述，帮助 agent 将来选它"},
-		"workflow_yaml": {Type: "string", Required: false, Desc: "可选：DAG 的 YAML 定义；不传则只写 SKILL.md 无 workflow"},
+		"workflow_yaml": {Type: "string", Required: false, Desc: "可选：DAG 的 YAML 定义。提供则存为 workflow 型"},
+		"tool_name":    {Type: "string", Required: false, Desc: "workflow_yaml 为空时必填：底层工具名（如 shell、grep）。Skill 将包装该工具"},
 	}}
 }
 
@@ -50,17 +53,36 @@ func (t *SaveAsSkillTool) Execute(_ context.Context, input map[string]any, _ too
 		return tool.Fail(fmt.Errorf("save_as_skill: name 不能为空")), nil
 	}
 
-	spec := &SkillSpec{
-		Name:           name,
-		Description:    desc,
-		Implementation: ImplWorkflow,
-		Workflow:       "workflow.yaml",
-		Body:           fmt.Sprintf("## Purpose\n%s\n\nAuto-generated skill.", desc),
-	}
+	wfYAML, _ := input["workflow_yaml"].(string)
+	toolName, _ := input["tool_name"].(string)
 
-	var wf []byte
-	if y, _ := input["workflow_yaml"].(string); y != "" {
-		wf = []byte(y)
+	var (
+		spec *SkillSpec
+		wf   []byte
+	)
+
+	if wfYAML != "" {
+		// 有 DAG → workflow 型
+		spec = &SkillSpec{
+			Name:           name,
+			Description:    desc,
+			Implementation: ImplWorkflow,
+			Workflow:       "workflow.yaml",
+			Body:           fmt.Sprintf("## Purpose\n%s\n\nAuto-generated skill.", desc),
+		}
+		wf = []byte(wfYAML)
+	} else {
+		// 无 DAG → tool 型（包装底层工具）
+		if toolName == "" {
+			toolName = "shell" // 默认：大多数简单操作都是 shell
+		}
+		spec = &SkillSpec{
+			Name:           name,
+			Description:    desc,
+			Implementation: ImplTool,
+			Tool:           toolName,
+			Body:           fmt.Sprintf("## Purpose\n%s\n\nWraps the `%s` tool.\n\nAuto-generated skill.", desc, toolName),
+		}
 	}
 
 	if err := Export(spec, t.SkillDir, wf); err != nil {

@@ -78,8 +78,9 @@ func TestEvolutionLoop_OnSaveCallback(t *testing.T) {
 	saveTool.OnSave = func(name string) { savedName = name }
 
 	_, err := saveTool.Execute(context.Background(), map[string]any{
-		"name":        "code_review",
-		"description": "Review code",
+		"name":          "code_review",
+		"description":   "Review code",
+		"workflow_yaml": "nodes:\n  - id: review\n    tool: echo\n",
 	}, nil)
 	if err != nil {
 		t.Fatalf("save: %v", err)
