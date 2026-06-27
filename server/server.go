@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"flux/adapter/postgres"
 	"flux/cost"
 	"flux/engine"
 	"flux/eventbus"
@@ -66,6 +67,14 @@ func NewServer(db *gorm.DB, rdb *redis.Client, cfg *config.Config) *Server {
 	nodeRuntimeRepo := query2.NewNodeRuntimeRepository(db)
 	taskCostTraceRepo := query2.NewTaskCostTraceRepository(db)
 	awaitBindingRepo := query2.NewAwaitBindingRepository(db)
+
+	// ── v3 Store 适配器：将 GORM repository 包装为 flux v3 Store 接口 ──
+	pgWorkflowStore := postgres.NewWorkflowStore(nodeRuntimeRepo, taskRepo)
+	pgAwaitStore := postgres.NewAwaitStore(awaitBindingRepo)
+	pgTraceStore := postgres.NewTraceStore(db)
+	_ = pgWorkflowStore // v3: 注入到 flux.Config.WorkflowStore
+	_ = pgAwaitStore    // v3: 注入到 flux.Config.AwaitStore
+	_ = pgTraceStore    // v3: 注入到 flux.Config.TraceStore
 
 	wsHub := websocket.NewWSHub(websocket.NewRepositoryTaskAccessChecker(taskRepo))
 

@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "flux-workflow": {
+      "command": "/Users/xiaoyuan/Documents/work/git/flux/flux-mcp-server",
+      "env": {
+        "LLM_API_KEY": "${LLM_API_KEY}",
+        "LLM_BASE_URL": "https://api.deepseek.com/v1",
+        "LLM_MODEL": "deepseek-v4-pro"
+      }
+    }
+  }
+}

@@ -91,7 +91,7 @@ func (p *DAGPlanner) Generate(ctx context.Context) (*runtime.Plan, error) {
 			Model:      p.Model,
 			Messages:   messages,
 			Tools:      []model.ToolDefinition{submitPlanTool},
-			ToolChoice: map[string]any{"type": "function", "function": map[string]any{"name": "submit_plan"}},
+			ToolChoice: "auto",
 		})
 		if err != nil {
 			return nil, fmt.Errorf("dag planner llm call: %w", err)

@@ -24,6 +24,7 @@ import (
 	"flux/planner"
 	"flux/runtime"
 	"flux/tool"
+	"flux/tool/builtin"
 )
 
 func main() {
@@ -41,12 +42,18 @@ func run(ctx context.Context) error {
 	}
 	modelName := envDefault("LLM_MODEL", "deepseek-chat")
 
+	reg := tool.NewRegistry()
+	// 注册 DAG 节点可用的工具：shell 执行命令，merge_result 合并结果。
+	wd, _ := os.Getwd()
+	reg.Register(builtin.NewShellTool(wd))
+	reg.Register(builtin.NewMergeResultTool())
+
 	s := &server{
-		reader:     bufio.NewReader(os.Stdin),
-		writer:     os.Stdout,
-		tools:      tool.NewRegistry(),
-		llm:        llmProvider,
-		modelName:  modelName,
+		reader:    bufio.NewReader(os.Stdin),
+		writer:    os.Stdout,
+		tools:     reg,
+		llm:       llmProvider,
+		modelName: modelName,
 	}
 	return s.serve(ctx)
 }
@@ -145,6 +152,11 @@ func (s *server) serve(ctx context.Context) error {
 			return fmt.Errorf("decode: %w", err)
 		}
 
+		// JSON-RPC notification（无 id）→ 不应回复
+		if req.ID == nil {
+			continue
+		}
+
 		resp := s.handle(ctx, req)
 		if err := enc.Encode(resp); err != nil {
 			return fmt.Errorf("encode: %w", err)
@@ -156,9 +168,6 @@ func (s *server) handle(ctx context.Context, req jsonrpcRequest) jsonrpcResponse
 	switch req.Method {
 	case "initialize":
 		return s.handleInitialize(req)
-	case "notifications/initialized":
-		// No response for notifications.
-		return jsonrpcResponse{JSONRPC: "2.0", ID: req.ID}
 	case "tools/list":
 		return s.handleToolsList(req)
 	case "tools/call":
