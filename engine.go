@@ -8,6 +8,7 @@ import (
 	"flux/definition"
 	"flux/runtime"
 	"flux/skill"
+	"flux/store"
 	"flux/tool"
 	"flux/workflow"
 )
@@ -18,6 +19,11 @@ type Engine struct {
 	toolReg  *tool.Registry
 	wfReg    map[string]*definition.WorkflowDefinition
 	skillReg *skill.Registry
+
+	// v3 Store 接口（可选）。非 nil 时优先使用，nil 时回退到 Backend。
+	workflowStore store.WorkflowStore
+	awaitStore    store.AwaitStore
+	traceStore    store.TraceStore
 
 	mu    sync.Mutex
 	tasks map[string]*taskRuntime // taskID → 运行时状态（支持并发任务）
@@ -39,13 +45,17 @@ type bindingRef struct {
 }
 
 // New 创建一个 Engine。
+// Backend 为必填（向后兼容）。当 Store 接口（v3）非 nil 时，Engine 优先使用 Store 接口进行持久化。
 func New(cfg Config) (*Engine, error) {
 	return &Engine{
-		backend:  cfg.Backend,
-		toolReg:  tool.NewRegistry(),
-		wfReg:    map[string]*definition.WorkflowDefinition{},
-		skillReg: skill.NewRegistry(),
-		tasks:    map[string]*taskRuntime{},
+		backend:       cfg.Backend,
+		toolReg:       tool.NewRegistry(),
+		wfReg:         map[string]*definition.WorkflowDefinition{},
+		skillReg:      skill.NewRegistry(),
+		tasks:         map[string]*taskRuntime{},
+		workflowStore: cfg.WorkflowStore,
+		awaitStore:    cfg.AwaitStore,
+		traceStore:    cfg.TraceStore,
 	}, nil
 }
 
@@ -97,10 +107,14 @@ func (e *Engine) Run(ctx context.Context, req RunRequest) (*RunResult, error) {
 
 	sched := runtime.NewScheduler(
 		&internalInvoker{reg: e.toolReg},
-		&internalAwait{backend: e.backend, taskID: taskID, tr: tr},
-		&internalStore{backend: e.backend, taskID: taskID},
+		&internalAwait{backend: e.backend, taskID: taskID, tr: tr, awaitStore: e.awaitStore},
+		&internalStore{backend: e.backend, taskID: taskID, workflowStore: e.workflowStore},
 		nil,
 	)
+	// v3: 如果配置了 TraceStore，启用 trace
+	if e.traceStore != nil {
+		sched = sched.WithTrace(&storeTraceSink{store: e.traceStore, taskID: taskID}, taskID)
+	}
 	tr.scheduler = sched
 
 	e.mu.Lock()
@@ -137,7 +151,15 @@ func (e *Engine) Notify(ctx context.Context, event Event) (*RunResult, error) {
 
 	// 原子幂等保护
 	if event.Error == "" {
-		claimed, err := e.backend.CompleteAwait(ctx, foundRef.bindingID)
+		var claimed bool
+		var err error
+		if e.awaitStore != nil {
+			// v3 path: 使用 AwaitStore
+			claimed, err = e.awaitStore.ResolveBinding(ctx, foundRef.bindingID)
+		} else {
+			// Backend path (向后兼容)
+			claimed, err = e.backend.CompleteAwait(ctx, foundRef.bindingID)
+		}
 		if err != nil {
 			return nil, fmt.Errorf("flux: CompleteAwait: %w", err)
 		}

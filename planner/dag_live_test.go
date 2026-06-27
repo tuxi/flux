@@ -8,17 +8,28 @@ package planner_test
 
 import (
 	"context"
+	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
+	"flux/model"
 	"flux/planner"
 	"flux/runtime"
 	"flux/tool"
 	"flux/tool/builtin"
 )
+
+// provider 创建 OpenAI-compatible provider。零值超时 = 90s。
+func provider(baseURL, apiKey string) *model.OpenAICompatibleProvider {
+	return &model.OpenAICompatibleProvider{
+		BaseURL:    baseURL,
+		APIKey:     apiKey,
+		HTTPClient: &http.Client{Timeout: 90 * time.Second},
+	}
+}
 
 func TestB_LLM_GeneratesParallelDAG(t *testing.T) {
 	apiKey := os.Getenv("LLM_API_KEY")

@@ -1,12 +1,23 @@
 package flux
 
-import "context"
+import (
+	"context"
+
+	"flux/store"
+)
 
 // ── Config ────────────────────────────────────────────────────────────────────
 
-// Config 是 Engine 的配置。唯一的必填字段是 Backend。
+// Config 是 Engine 的配置。Backend 为必填（向后兼容），Store 接口为可选（v3 新增）。
 type Config struct {
-	Backend Backend // 宿主提供的持久化 + 异步基础设施
+	Backend Backend // 宿主提供的持久化 + 异步基础设施（向后兼容）
+
+	// ── v3 Store 接口（可选）──
+	// 当 Store 接口非 nil 时，Engine 优先使用 Store 接口（而非 Backend）进行持久化。
+	// 当 Store 接口为 nil 时，Engine 回退到 Backend（向后兼容）。
+	WorkflowStore store.WorkflowStore // nil → 回退到 Backend
+	AwaitStore    store.AwaitStore    // nil → 回退到 Backend
+	TraceStore    store.TraceStore    // nil → 不记录 trace
 }
 
 // Backend 是宿主必须实现的持久化契约。

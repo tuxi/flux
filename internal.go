@@ -2,12 +2,14 @@ package flux
 
 import (
 	"context"
+	"fmt"
 
 	"flux/runtime"
+	"flux/store"
 	"flux/tool"
 )
 
-// ── 内部适配器：把 Backend 接口适配成 runtime 端口 ──
+// ── 内部适配器：把 Backend / Store 接口适配成 runtime 端口 ──
 
 type internalInvoker struct{ reg *tool.Registry }
 
@@ -29,41 +31,71 @@ func (i *internalInvoker) Invoke(ctx context.Context, toolName string, input map
 	return res.Data, nil
 }
 
+// ── Await 适配器 ──
+
 type internalAwait struct {
 	backend Backend
 	taskID  string
 	tr      *taskRuntime // 存 binding 索引
+
+	// v3: 可选的 Store 接口，优先于 Backend
+	awaitStore store.AwaitStore
 }
 
 func (a *internalAwait) Begin(ctx context.Context, node *runtime.PlanNode, input map[string]any) (int64, error) {
-	// 从 input 中提取真实的外部 job ID（TTS → job_id，图片 → task_id，通用 → provider_task_id）
 	providerTaskID := realProviderTaskID(input)
 	if providerTaskID == "" {
-		// 兜底：无真实 ID 时自生成（sync workflow 的虚拟 async 节点）
 		providerTaskID = a.taskID + "_" + node.Name
 	}
 
-	bindingID, err := a.backend.CreateAwait(ctx, a.taskID, node.Name, providerTaskID, input)
-	if err != nil {
-		return 0, err
+	var bindingID string
+	if a.awaitStore != nil {
+		// v3 path: 使用 AwaitStore
+		b := store.AwaitBinding{
+			BindingID:      fmt.Sprintf("%s_%s", a.taskID, node.Name),
+			TaskID:         a.taskID,
+			NodeName:       node.Name,
+			ProviderTaskID: providerTaskID,
+			Status:         store.AwaitStatusAwaiting,
+			Input:          input,
+		}
+		if err := a.awaitStore.CreateBinding(ctx, b); err != nil {
+			return 0, err
+		}
+		bindingID = b.BindingID
+	} else {
+		// Backend path (向后兼容)
+		var err error
+		bindingID, err = a.backend.CreateAwait(ctx, a.taskID, node.Name, providerTaskID, input)
+		if err != nil {
+			return 0, err
+		}
 	}
 
-	// 存入索引：后续 Notify 通过 providerTaskID 查找
 	a.tr.awaitIndex[providerTaskID] = bindingRef{
 		bindingID: bindingID,
 		nodeName:  node.Name,
 	}
 
-	// 返回 binding 的数字 ID（runtime 内部用）
 	return int64(len(a.tr.awaitIndex)), nil
 }
+
+// ── Store 适配器 ──
 
 type internalStore struct {
 	backend Backend
 	taskID  string
+
+	// v3: 可选的 Store 接口，优先于 Backend
+	workflowStore store.WorkflowStore
 }
 
 func (s *internalStore) PersistNode(ctx context.Context, node string, state runtime.NodeState, out map[string]any) error {
+	if s.workflowStore != nil {
+		// v3 path: 使用 WorkflowStore
+		return s.workflowStore.PersistNode(ctx, s.taskID, node, state, out)
+	}
+	// Backend path (向后兼容)
 	return s.backend.PersistNode(ctx, s.taskID, node, NodeState(state), out)
 }
 
