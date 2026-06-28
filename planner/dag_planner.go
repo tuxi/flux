@@ -139,11 +139,11 @@ func (p *DAGPlanner) Generate(ctx context.Context) (*runtime.Plan, error) {
 
 // GenerateWorkflow 生成一张校验通过的 DAG，返回 v1 engine 可直接执行的 WorkflowDefinition。
 // 这是 v3 AI 规划 + v1 可靠执行的关键桥接。
-func (p *DAGPlanner) GenerateWorkflow(ctx context.Context) (*definition.WorkflowDefinition, error) {
+func (p *DAGPlanner) GenerateWorkflow(ctx context.Context, workflowTools map[string]string) (*definition.WorkflowDefinition, error) {
 	if _, err := p.Generate(ctx); err != nil {
 		return nil, err
 	}
-	return SpecToWorkflow(p.lastSpec, p.Goal), nil
+	return SpecToWorkflow(p.lastSpec, p.Goal, workflowTools), nil
 }
 
 // validatePlan 是 FR5 的核心：工具存在 / 依赖合法 / 无环 / 必填参数齐全。

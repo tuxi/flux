@@ -18,7 +18,9 @@ import (
 //   - Async AwaitBinding + Poll Worker
 //   - 分布式锁 + Crash Recovery
 //   - Task Events 事件流
-func SpecToWorkflow(spec planSpec, goal string) *definition.WorkflowDefinition {
+// SpecToWorkflow 将 DAGPlanner 生成的 planSpec 转为 v1 engine 可执行的 WorkflowDefinition。
+// workflowTools: 已知的 "工具名 → 工作流定义名" 映射，用于将 workflow-as-tool 转为 NodeSubWorkflow。
+func SpecToWorkflow(spec planSpec, goal string, workflowTools map[string]string) *definition.WorkflowDefinition {
 	name := sanitizeName(goal)
 	nodes := make([]definition.NodeDefinition, 0, len(spec.Nodes)+2)
 	edges := make([]definition.EdgeDefinition, 0, len(spec.Nodes)+len(spec.Nodes))
@@ -36,12 +38,19 @@ func SpecToWorkflow(spec planSpec, goal string) *definition.WorkflowDefinition {
 		nodeIDs[n.ID] = true
 
 		inputMapping := convertArguments(n.Arguments, n.ID)
+		// 检查是否为预制工作流工具 → 转为 NodeSubWorkflow
+		nodeType := definition.NodeType(definition.NodeTool)
+		config := map[string]any{"tool": n.Tool}
+		if wfName, ok := workflowTools[n.Tool]; ok {
+			nodeType = definition.NodeType(definition.NodeSubWorkflow)
+			config = map[string]any{"workflow": wfName}
+		}
 		nd := definition.NodeDefinition{
 			Name:         n.ID,
 			Label:        n.ID,
-			Type:         definition.NodeTool,
+			Type:         nodeType,
 			Weight:       0.05,
-			Config:       map[string]any{"tool": n.Tool},
+			Config:       config,
 			InputMapping: inputMapping,
 		}
 		nodes = append(nodes, nd)
