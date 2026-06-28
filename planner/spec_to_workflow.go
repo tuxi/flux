@@ -18,7 +18,7 @@ import (
 //   - 分布式锁 + Crash Recovery
 //   - Task Events 事件流
 func SpecToWorkflow(spec planSpec, goal string) *definition.WorkflowDefinition {
-	name := "ai_generated_" + sanitizeName(goal)
+	name := sanitizeName(goal)
 	nodes := make([]definition.NodeDefinition, 0, len(spec.Nodes)+2)
 	edges := make([]definition.EdgeDefinition, 0, len(spec.Nodes)+len(spec.Nodes))
 
@@ -140,8 +140,9 @@ func sanitizeName(goal string) string {
 }
 
 func truncate(s string, n int) string {
-	if len(s) <= n {
+	runes := []rune(s)
+	if len(runes) <= n {
 		return s
 	}
-	return s[:n] + "..."
+	return string(runes[:n]) + "..."
 }
