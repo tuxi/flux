@@ -91,9 +91,36 @@ func SpecToWorkflow(spec planSpec, goal string) *definition.WorkflowDefinition {
 		Desc:  "AI 自主规划: " + truncate(goal, 100),
 		Nodes: nodes,
 		Edges: edges,
-		Output: definition.OutputDefinition{
-			ResultType: "generic", // Agent 生成的 DAG 默认输出类型
-		},
+		Output: buildOutput(spec),
+	}
+}
+
+// buildOutput 从 planSpec 的 output_mapping 构建 OutputDefinition。
+// 当 LLM 指定了 output_mapping 时使用；否则退回到默认泛型输出。
+func buildOutput(spec planSpec) definition.OutputDefinition {
+	resultType := spec.ResultType
+	if resultType == "" {
+		resultType = "generic"
+	}
+
+	// 从 output_mapping 提取 PrimaryFileUrl
+	primaryFileUrl := ""
+	if url, ok := spec.OutputMapping["primary_file_url"]; ok {
+		primaryFileUrl = fmt.Sprintf("nodes.%s", url)
+	}
+
+	extras := make(map[string]string)
+	for k, v := range spec.OutputMapping {
+		if k == "primary_file_url" {
+			continue
+		}
+		extras[k] = fmt.Sprintf("nodes.%s", v)
+	}
+
+	return definition.OutputDefinition{
+		ResultType:     resultType,
+		PrimaryFileUrl: primaryFileUrl,
+		Extras:         extras,
 	}
 }
 

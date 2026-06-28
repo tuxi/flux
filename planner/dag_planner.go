@@ -60,7 +60,9 @@ type nodeSpec struct {
 }
 
 type planSpec struct {
-	Nodes []nodeSpec `json:"nodes"`
+	Nodes         []nodeSpec       `json:"nodes"`
+	OutputMapping map[string]string `json:"output_mapping,omitempty"` // "primary_file_url": "upload_result.url"
+	ResultType    string           `json:"result_type,omitempty"`     // "image", "video", "generic"
 }
 
 const dagSystemPrompt = `You are a planner. Given a goal and a catalog of tools, produce ONE complete
@@ -81,6 +83,8 @@ CRITICAL — $from field correctness:
   use {"$from": "generate_script", "field": "video_script"} — NOT "script_content".
 - If unsure which node outputs a field, check the tool catalog output descriptions.
 
+- Specify result_type based on the goal: "image" for image generation, "video" for video, "generic" otherwise.
+- Specify output_mapping to expose key results, e.g. {"primary_file_url": "upload.url", "width": "postprocess.width"}. Use <node_id>.<field> syntax.
 - Do NOT call the tools yourself. Call ONLY submit_plan once with the complete plan.
 - If validation_errors are returned, carefully fix ALL listed errors before retrying.`
 
@@ -416,7 +420,7 @@ var submitPlanTool = model.ToolDefinition{
 	Type: "function",
 	Function: model.FunctionSchema{
 		Name:        "submit_plan",
-		Description: "Submit the complete execution plan as a DAG of tool-call nodes.",
+		Description: "Submit the complete execution plan as a DAG of tool-call nodes with output mapping.",
 		Parameters: map[string]any{
 			"type": "object",
 			"properties": map[string]any{
@@ -433,8 +437,16 @@ var submitPlanTool = model.ToolDefinition{
 						"required": []string{"id", "tool"},
 					},
 				},
+				"result_type": map[string]any{
+					"type":        "string",
+					"description": "Result type: 'image', 'video', 'audio', or 'generic'",
+				},
+				"output_mapping": map[string]any{
+					"type":        "object",
+					"description": "Map result fields to node outputs, e.g. {\"primary_file_url\": \"upload_result.url\", \"width\": \"final_node.width\"}. Use 'nodes.<node_id>.output.<field>' format with expr-like syntax.",
+				},
 			},
-			"required": []string{"nodes"},
+			"required": []string{"nodes", "result_type"},
 		},
 	},
 }
