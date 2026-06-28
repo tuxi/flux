@@ -3,6 +3,7 @@ package planner
 import (
 	"crypto/sha256"
 	"fmt"
+	"strings"
 
 	"flux/definition"
 )
@@ -103,10 +104,19 @@ func buildOutput(spec planSpec) definition.OutputDefinition {
 		resultType = "generic"
 	}
 
-	// 从 output_mapping 提取 PrimaryFileUrl
+	// 转换 LLM 的输出映射为 expr 表达式
+	// LLM 输出 "upload_storage.url" → "nodes.upload_storage.output.url"
+	toExpr := func(nodeDotField string) string {
+		parts := strings.SplitN(nodeDotField, ".", 2)
+		if len(parts) == 2 {
+			return fmt.Sprintf("nodes.%s.output.%s", parts[0], parts[1])
+		}
+		return fmt.Sprintf("nodes.%s", nodeDotField)
+	}
+
 	primaryFileUrl := ""
 	if url, ok := spec.OutputMapping["primary_file_url"]; ok {
-		primaryFileUrl = fmt.Sprintf("nodes.%s", url)
+		primaryFileUrl = toExpr(url)
 	}
 
 	extras := make(map[string]string)
@@ -114,7 +124,7 @@ func buildOutput(spec planSpec) definition.OutputDefinition {
 		if k == "primary_file_url" {
 			continue
 		}
-		extras[k] = fmt.Sprintf("nodes.%s", v)
+		extras[k] = toExpr(v)
 	}
 
 	return definition.OutputDefinition{
