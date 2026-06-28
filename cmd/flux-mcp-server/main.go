@@ -47,6 +47,8 @@ func run(ctx context.Context) error {
 	wd, _ := os.Getwd()
 	reg.Register(builtin.NewShellTool(wd))
 	reg.Register(builtin.NewMergeResultTool())
+	// 商品视频生成工具 — Agent 可自主编排 DAG
+	registerGoodsTools(reg)
 
 	s := &server{
 		reader:    bufio.NewReader(os.Stdin),
