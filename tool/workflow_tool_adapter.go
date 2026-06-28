@@ -35,6 +35,11 @@ func (t *WorkflowAsTool) InputSchema() DataSchema   { return t.schema }
 func (t *WorkflowAsTool) OutputSchema() DataSchema  { return DataSchema{} }
 func (t *WorkflowAsTool) Mode() ExecutionMode       { return SyncExecution }
 
+// SetExecutor 设置工作流的执行函数（用于延迟注入，如 engine 创建后）。
+func (t *WorkflowAsTool) SetExecutor(fn func(ctx context.Context, input map[string]any, emitter ToolEmitter) (*Result, error)) {
+	t.executor = fn
+}
+
 func (t *WorkflowAsTool) Execute(ctx context.Context, input map[string]any, emitter ToolEmitter) (*Result, error) {
 	if t.executor == nil {
 		return Fail(fmt.Errorf("workflow %s: no executor configured", t.name)), nil
