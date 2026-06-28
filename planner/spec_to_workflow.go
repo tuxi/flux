@@ -134,10 +134,11 @@ func convertArguments(args map[string]any, nodeID string) map[string]string {
 }
 
 func sanitizeName(goal string) string {
-	// 取前 50 个字符，只保留字母数字和中文
+	// 取前 50 个 rune（非字节），只保留字母数字和中文
 	name := goal
-	if len(name) > 50 {
-		name = name[:50]
+	runes := []rune(name)
+	if len(runes) > 50 {
+		name = string(runes[:50])
 	}
 	return strings.Map(func(r rune) rune {
 		if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') || r > 127 {
