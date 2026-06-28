@@ -91,6 +91,9 @@ func SpecToWorkflow(spec planSpec, goal string) *definition.WorkflowDefinition {
 		Desc:  "AI 自主规划: " + truncate(goal, 100),
 		Nodes: nodes,
 		Edges: edges,
+		Output: definition.OutputDefinition{
+			ResultType: "generic", // Agent 生成的 DAG 默认输出类型
+		},
 	}
 }
 
