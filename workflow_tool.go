@@ -80,6 +80,9 @@ func NewWorkflowTool(cfg WorkflowToolConfig) *WorkflowTool {
 func (t *WorkflowTool) Name() string            { return "plan_workflow" }
 func (t *WorkflowTool) Mode() tool.ExecutionMode { return tool.SyncExecution }
 
+// Registry 返回 WorkflowTool 内部的工具注册表，供 DAGPlanner 使用。
+func (t *WorkflowTool) Registry() *tool.Registry { return t.toolReg }
+
 func (t *WorkflowTool) Description() string {
 	return "给定目标和可用工具目录，生成并执行一个多步 Workflow DAG。" +
 		"Flux Engine 会将目标编译为一张有向无环图（DAG），进行依赖求解和并行执行，并返回每个节点的产出。" +

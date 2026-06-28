@@ -24,6 +24,7 @@ import (
 	"fmt"
 	"strings"
 
+	"flux/definition"
 	"flux/model"
 	"flux/runtime"
 	"flux/tool"
@@ -66,13 +67,22 @@ const dagSystemPrompt = `You are a planner. Given a goal and a catalog of tools,
 execution plan as a directed acyclic graph by calling submit_plan exactly once.
 
 Rules:
-- Each node is exactly one tool call.
+- Each node is exactly one tool call. Use descriptive IDs (e.g. "validate_params", "normalize_image").
 - Use depends_on to express ordering: a node runs only after ALL nodes it lists have succeeded.
 - Independent nodes (empty depends_on) may run in parallel — express real parallelism this way.
-- An argument value may be a literal, OR a reference to an upstream node's output:
-  {"$from": "<node id>", "field": "<output field name>"}  (omit "field" for the whole output object).
-  ANY node referenced via $from MUST be listed in that node's depends_on (a data dependency is a graph edge).
-- Do NOT call the tools yourself. Call ONLY submit_plan, once, with the whole plan.`
+- Tool arguments may be literals OR $from references: {"$from": "<node id>", "field": "<output field>"}.
+  Omit "field" to reference the entire output object.
+  A node referenced via $from MUST appear in depends_on (data dependency = graph edge).
+
+CRITICAL — $from field correctness:
+- Each tool's output fields are listed as "输出: field1(type), field2(type)".
+- ONLY reference fields that appear in the source tool's output list.
+- Example: if "generate_script" outputs "video_script, voiceover_text",
+  use {"$from": "generate_script", "field": "video_script"} — NOT "script_content".
+- If unsure which node outputs a field, check the tool catalog output descriptions.
+
+- Do NOT call the tools yourself. Call ONLY submit_plan once with the complete plan.
+- If validation_errors are returned, carefully fix ALL listed errors before retrying.`
 
 // Generate 让 LLM 产出一张校验通过的 DAG，返回可执行的 runtime.Plan。
 // 调用方：sched.Run(ctx, runtime.NewStaticSource(plan), state)。
@@ -113,7 +123,7 @@ func (p *DAGPlanner) Generate(ctx context.Context) (*runtime.Plan, error) {
 
 		// FR5：执行前校验
 		if errs := validatePlan(spec, p.registry); len(errs) > 0 {
-			messages = append(messages, toolMsg(call.ID, fmt.Sprintf(`{"validation_errors":%s}`, jsonList(errs))))
+			messages = append(messages, toolMsg(call.ID, fmt.Sprintf(`{"validation_errors":%s,"hint":"Study the tool catalog output fields carefully. Each $from field MUST match an output field listed for that tool. Check that every $from target is also in depends_on."}`, jsonList(errs))))
 			continue
 		}
 
@@ -121,6 +131,15 @@ func (p *DAGPlanner) Generate(ctx context.Context) (*runtime.Plan, error) {
 		return buildPlan(spec), nil
 	}
 	return nil, fmt.Errorf("dag planner: plan did not validate within %d repair rounds", p.MaxRepairs)
+}
+
+// GenerateWorkflow 生成一张校验通过的 DAG，返回 v1 engine 可直接执行的 WorkflowDefinition。
+// 这是 v3 AI 规划 + v1 可靠执行的关键桥接。
+func (p *DAGPlanner) GenerateWorkflow(ctx context.Context) (*definition.WorkflowDefinition, error) {
+	if _, err := p.Generate(ctx); err != nil {
+		return nil, err
+	}
+	return SpecToWorkflow(p.lastSpec, p.Goal), nil
 }
 
 // validatePlan 是 FR5 的核心：工具存在 / 依赖合法 / 无环 / 必填参数齐全。
@@ -329,11 +348,50 @@ func requiredFields(schema json.RawMessage) []string {
 
 func toolCatalog(reg *tool.Registry) string {
 	var b strings.Builder
+	b.WriteString("Available tools (name: description | 输入: ... | 输出: ...):\n")
 	for _, t := range reg.List() {
 		d := tool.DefinitionOf(t)
-		b.WriteString(fmt.Sprintf("- %s: %s\n  input schema: %s\n", d.Name, d.Description, string(d.InputSchema)))
+		b.WriteString(fmt.Sprintf("- %s: %s\n", d.Name, d.Description))
+		b.WriteString(fmt.Sprintf("  输入: %s\n", toolInputSummary(d.InputSchema)))
+		b.WriteString(fmt.Sprintf("  输出: %s\n", toolOutputSummary(t)))
 	}
 	return b.String()
+}
+
+// toolInputSummary returns a compact, human-readable list of input fields with types.
+func toolInputSummary(schema json.RawMessage) string {
+	if len(schema) == 0 {
+		return "(any)"
+	}
+	var s struct {
+		Properties map[string]struct {
+			Type        string `json:"type"`
+			Description string `json:"description"`
+		} `json:"properties"`
+		Required []string `json:"required"`
+	}
+	if err := json.Unmarshal(schema, &s); err != nil || len(s.Properties) == 0 {
+		return "(any)"
+	}
+	parts := make([]string, 0, len(s.Properties))
+	for name, prop := range s.Properties {
+		t := prop.Type
+		if t == "" {
+			t = "string"
+		}
+		parts = append(parts, fmt.Sprintf("%s(%s)", name, t))
+	}
+	return strings.Join(parts, ", ")
+}
+
+// toolOutputSummary returns the output fields declared by the tool.
+func toolOutputSummary(t tool.Tool) string {
+	schema := tool.DefinitionOf(t).OutputSchema
+	if len(schema) == 0 {
+		// Fallback: check if it's a mock tool (no output schema defined)
+		return "(echoes input)"
+	}
+	return toolInputSummary(schema)
 }
 
 func findCall(resp model.Response, name string) *model.ToolCall {
