@@ -1,8 +1,8 @@
 package planner
 
 import (
+	"crypto/sha256"
 	"fmt"
-	"strings"
 
 	"flux/definition"
 )
@@ -134,18 +134,9 @@ func convertArguments(args map[string]any, nodeID string) map[string]string {
 }
 
 func sanitizeName(goal string) string {
-	// 取前 50 个 rune（非字节），只保留字母数字和中文
-	name := goal
-	runes := []rune(name)
-	if len(runes) > 50 {
-		name = string(runes[:50])
-	}
-	return strings.Map(func(r rune) rune {
-		if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') || r > 127 {
-			return r
-		}
-		return '_'
-	}, name)
+	// 用 goal 的 SHA256 前 8 位 + 固定前缀，保证 ASCII-safe 且在 DB 中唯一
+	h := sha256.Sum256([]byte(goal))
+	return fmt.Sprintf("ai_gen_%x", h[:4])
 }
 
 func truncate(s string, n int) string {
