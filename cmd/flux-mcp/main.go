@@ -30,6 +30,7 @@ func main() {
 	reg.Register(builtin.NewMergeResultTool())
 	reg.Register(builtin.NewWriteFileTool(dir))
 	reg.Register(builtin.NewCompileTool(dir))
+	reg.Register(builtin.NewShellTool(dir)) // 解锁视频/媒体剪辑等 shell 节点（ffmpeg 等）
 
 	srv := mcp.NewServer(reg)
 	if err := srv.ServeStdio(context.Background()); err != nil {

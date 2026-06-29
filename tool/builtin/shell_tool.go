@@ -26,7 +26,9 @@ type ShellTool struct {
 }
 
 func NewShellTool(baseDir string) *ShellTool {
-	return &ShellTool{baseDir: baseDir, defaultTimeout: 60 * time.Second}
+	// 默认 300s：适配视频转码/渲染等长耗时命令（1 分钟 1080p 转码就要 15-50s 不等）。
+	// 快命令仍可显式调小 timeout_seconds 以更快暴露卡死。
+	return &ShellTool{baseDir: baseDir, defaultTimeout: 300 * time.Second}
 }
 
 func (ShellTool) Name() string { return "shell" }
@@ -34,13 +36,13 @@ func (ShellTool) Name() string { return "shell" }
 func (ShellTool) Description() string {
 	return "在工作目录运行一条 shell 命令（sh -c），用于跑测试/构建/运行程序，例如 `go test ./...`。" +
 		"返回 stdout、stderr、exit_code、timed_out。命令非零退出或超时不是工具错误。" +
-		"可选 timeout_seconds 控制超时（默认 60）；对可能很慢/会卡死的命令应调小或自带 -timeout。"
+		"可选 timeout_seconds 控制超时（默认 300，适配视频转码/渲染等长任务）；对快命令或可能卡死的命令应调小。"
 }
 
 func (ShellTool) InputSchema() tool.DataSchema {
 	return tool.DataSchema{Fields: map[string]tool.FieldSchema{
 		"command":         {Type: "string", Required: true, Desc: "要执行的 shell 命令行，如 go test ./..."},
-		"timeout_seconds": {Type: "integer", Required: false, Desc: "命令超时秒数，默认 60；长命令或可能卡死的命令应调小"},
+		"timeout_seconds": {Type: "integer", Required: false, Desc: "命令超时秒数，默认 300；视频转码/渲染等长任务按需调大，快命令或可能卡死的命令应调小"},
 	}}
 }
 

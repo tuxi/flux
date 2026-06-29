@@ -83,6 +83,9 @@ CRITICAL — $from field correctness:
   use {"$from": "generate_script", "field": "video_script"} — NOT "script_content".
 - If unsure which node outputs a field, check the tool catalog output descriptions.
 
+- Long-running commands (video transcoding/rendering, large builds, model inference) can be slow.
+  If a tool accepts a "timeout_seconds" argument, set it generously for such nodes (e.g. ffmpeg
+  encode → 300+). Default timeouts are tuned for quick commands and will kill long jobs early.
 - Specify result_type based on the goal: "image" for image generation, "video" for video, "generic" otherwise.
 - Specify output_mapping to expose key results, e.g. {"primary_file_url": "upload.url", "width": "postprocess.width"}. Use <node_id>.<field> syntax.
 - Do NOT call the tools yourself. Call ONLY submit_plan once with the complete plan.
