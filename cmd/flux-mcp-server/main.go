@@ -16,10 +16,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"net/http"
 	"os"
 	"time"
 
+	flux "github.com/tuxi/flux"
 	"github.com/tuxi/flux/model"
 	"github.com/tuxi/flux/planner"
 	"github.com/tuxi/flux/runtime"
@@ -35,12 +35,14 @@ func main() {
 }
 
 func run(ctx context.Context) error {
-	llmProvider := &model.OpenAICompatibleProvider{
-		BaseURL:    envDefault("LLM_BASE_URL", "https://api.deepseek.com/v1"),
-		APIKey:     os.Getenv("LLM_API_KEY"),
-		HTTPClient: &http.Client{Timeout: 90 * time.Second},
+	// 作为独立 MCP server（如被 Claude Code 调用）时，没有 host 注入 LLM 凭证，
+	// 由 flux 自己从 config.yaml + 环境变量加载。FLUX_CONFIG 可指定配置文件路径。
+	llmCfg, err := flux.LoadLLMConfig(envDefault("FLUX_CONFIG", "config.yaml"))
+	if err != nil {
+		return err
 	}
-	modelName := envDefault("LLM_MODEL", "deepseek-chat")
+	llmProvider := llmCfg.NewProvider(90 * time.Second)
+	modelName := llmCfg.Model
 
 	reg := tool.NewRegistry()
 	// 注册 DAG 节点可用的工具：shell 执行命令，merge_result 合并结果。

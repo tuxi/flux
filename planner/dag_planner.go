@@ -31,7 +31,7 @@ import (
 )
 
 type DAGPlanner struct {
-	Provider   *model.OpenAICompatibleProvider
+	Provider   model.Completer // 任意 LLM 后端（*OpenAICompatibleProvider 满足；含 OpenAI 兼容网关）
 	Model      string
 	Goal       string
 	System     string
@@ -41,7 +41,7 @@ type DAGPlanner struct {
 	lastSpec planSpec // 最近一次校验通过的计划（供检视/调试）
 }
 
-func NewDAGPlanner(provider *model.OpenAICompatibleProvider, modelName, goal string, reg *tool.Registry) *DAGPlanner {
+func NewDAGPlanner(provider model.Completer, modelName, goal string, reg *tool.Registry) *DAGPlanner {
 	return &DAGPlanner{
 		Provider:   provider,
 		Model:      modelName,
@@ -147,13 +147,6 @@ func (p *DAGPlanner) GenerateWorkflow(ctx context.Context, workflowTools map[str
 		return nil, err
 	}
 	return SpecToWorkflow(p.lastSpec, p.Goal, workflowTools), nil
-}
-
-// LastSpecJSON 返回最近一次校验通过的计划的 JSON（节点 id/tool/arguments/depends_on）。
-// 诊断用：暴露 LLM 实际生成了什么 DAG，便于排查「节点产出为空」是规划问题还是执行问题。
-func (p *DAGPlanner) LastSpecJSON() string {
-	b, _ := json.MarshalIndent(p.lastSpec, "", "  ")
-	return string(b)
 }
 
 // validatePlan 是 FR5 的核心：工具存在 / 依赖合法 / 无环 / 必填参数齐全。

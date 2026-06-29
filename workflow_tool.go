@@ -3,7 +3,6 @@ package flux
 import (
 	"context"
 	"fmt"
-	"log"
 
 	"github.com/tuxi/flux/model"
 	"github.com/tuxi/flux/planner"
@@ -27,7 +26,7 @@ import (
 //	    AwaitStore: myAwaitStore,           // 可选：v3 Store 接口
 //	})
 type WorkflowTool struct {
-	provider   *model.OpenAICompatibleProvider
+	provider   model.Completer
 	modelName  string
 	toolReg    *tool.Registry
 	wfStore    store.WorkflowStore
@@ -38,8 +37,10 @@ type WorkflowTool struct {
 
 // WorkflowToolConfig 是 WorkflowTool 的配置。
 type WorkflowToolConfig struct {
-	// Provider 是 DAGPlanner 使用的 LLM provider（OpenAI-compatible）。必填。
-	Provider *model.OpenAICompatibleProvider
+	// Provider 是 DAGPlanner 使用的 LLM provider。必填。
+	// 类型为 model.Completer 接口——*OpenAICompatibleProvider 满足它，
+	// 任意 OpenAI 兼容端点/网关（DeepSeek/Qwen/Claude-via-gateway）皆可注入。
+	Provider model.Completer
 
 	// ModelName 是传给 LLM 的模型名。默认 "deepseek-chat"。
 	ModelName string
@@ -131,10 +132,6 @@ func (t *WorkflowTool) Execute(ctx context.Context, input map[string]any, emitte
 		})
 	}
 
-	// ── 诊断日志（定位 null 产出在哪一层；问题确认后可删）──
-	// 嫌疑 A：LLM 生成了退化的 DAG（选错工具/参数空）→ 看下面这段 DAG JSON。
-	log.Printf("[flux:diag] goal=%q\n[flux:diag] generated DAG:\n%s", goal, dagPlanner.LastSpecJSON())
-
 	// 2. 构建 Scheduler
 	sched := runtime.NewScheduler(
 		planner.NewToolInvoker(t.toolReg),
@@ -160,18 +157,10 @@ func (t *WorkflowTool) Execute(ctx context.Context, input map[string]any, emitte
 	// 4. 收集所有节点产出
 	output := make(map[string]any)
 	for _, name := range state.Nodes() {
-		out := state.Output(name)
-		// ── 诊断日志：逐节点打印 state + 原始产出（含 nil），区分 B/C 两类嫌疑 ──
-		// 嫌疑 C：节点成功但 tool 返回 Success(nil) → output_nil=true（问题在工具实现/注册，code-agent 侧）。
-		// 嫌疑 B：output 有数据却没进 output map → 这段代码没变且实测正常，预期不会发生。
-		log.Printf("[flux:diag] node=%q state=%d output_nil=%t output=%v",
-			name, state.State(name), out == nil, out)
-		if out != nil {
+		if out := state.Output(name); out != nil {
 			output[name] = out
 		}
 	}
-	log.Printf("[flux:diag] collected %d/%d non-nil node outputs -> returning to caller",
-		len(output), len(state.Nodes()))
 
 	return tool.Success(output), nil
 }
