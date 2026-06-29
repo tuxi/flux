@@ -116,8 +116,21 @@ func (p *DAGPlanner) Generate(ctx context.Context) (*runtime.Plan, error) {
 		messages = append(messages, model.Message{Role: "assistant", Content: resp.Content, ToolCalls: resp.ToolCalls})
 
 		call := findCall(resp, "submit_plan")
+
+		// OpenAI 语义：带 tool_calls 的 assistant 消息后，**每个** tool_call_id 都必须有
+		// 对应的 tool 响应消息。小/快模型常会调 submit_plan 之外的工具（或额外工具），
+		// 这些 tool_call 也要各回一条——否则下一轮（repair）请求历史不合法，严格的
+		// provider（deepseek 等）直接 400：「assistant message with 'tool_calls' must be
+		// followed by tool messages responding to each 'tool_call_id'」。
+		for _, tc := range resp.ToolCalls {
+			if call != nil && tc.ID == call.ID {
+				continue // submit_plan 的响应在下方按 JSON/校验结果决定内容
+			}
+			messages = append(messages, toolMsg(tc.ID, `{"error":"unexpected tool; call submit_plan exactly once with the complete plan"}`))
+		}
+
 		if call == nil {
-			// 没按要求调 submit_plan：让它重来。
+			// 没按要求调 submit_plan：让它重来（上面已对任何错误工具回过 tool 消息）。
 			messages = append(messages, model.Message{Role: "user", Content: "You must produce the plan by calling submit_plan. Try again."})
 			continue
 		}
