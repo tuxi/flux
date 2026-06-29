@@ -149,6 +149,13 @@ func (p *DAGPlanner) GenerateWorkflow(ctx context.Context, workflowTools map[str
 	return SpecToWorkflow(p.lastSpec, p.Goal, workflowTools), nil
 }
 
+// LastSpecJSON 返回最近一次校验通过的计划的 JSON（节点 id/tool/arguments/depends_on）。
+// 诊断用：暴露 LLM 实际生成了什么 DAG，便于排查「节点产出为空」是规划问题还是执行问题。
+func (p *DAGPlanner) LastSpecJSON() string {
+	b, _ := json.MarshalIndent(p.lastSpec, "", "  ")
+	return string(b)
+}
+
 // validatePlan 是 FR5 的核心：工具存在 / 依赖合法 / 无环 / 必填参数齐全。
 // （类型/枚举等完整 JSON Schema 校验需要 schema 校验库，本版不引入，诚实留作后续。）
 func validatePlan(spec planSpec, reg *tool.Registry) []string {

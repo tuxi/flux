@@ -3,6 +3,7 @@ package flux
 import (
 	"context"
 	"fmt"
+	"log"
 
 	"github.com/tuxi/flux/model"
 	"github.com/tuxi/flux/planner"
@@ -130,6 +131,10 @@ func (t *WorkflowTool) Execute(ctx context.Context, input map[string]any, emitte
 		})
 	}
 
+	// ── 诊断日志（定位 null 产出在哪一层；问题确认后可删）──
+	// 嫌疑 A：LLM 生成了退化的 DAG（选错工具/参数空）→ 看下面这段 DAG JSON。
+	log.Printf("[flux:diag] goal=%q\n[flux:diag] generated DAG:\n%s", goal, dagPlanner.LastSpecJSON())
+
 	// 2. 构建 Scheduler
 	sched := runtime.NewScheduler(
 		planner.NewToolInvoker(t.toolReg),
@@ -155,10 +160,18 @@ func (t *WorkflowTool) Execute(ctx context.Context, input map[string]any, emitte
 	// 4. 收集所有节点产出
 	output := make(map[string]any)
 	for _, name := range state.Nodes() {
-		if out := state.Output(name); out != nil {
+		out := state.Output(name)
+		// ── 诊断日志：逐节点打印 state + 原始产出（含 nil），区分 B/C 两类嫌疑 ──
+		// 嫌疑 C：节点成功但 tool 返回 Success(nil) → output_nil=true（问题在工具实现/注册，code-agent 侧）。
+		// 嫌疑 B：output 有数据却没进 output map → 这段代码没变且实测正常，预期不会发生。
+		log.Printf("[flux:diag] node=%q state=%d output_nil=%t output=%v",
+			name, state.State(name), out == nil, out)
+		if out != nil {
 			output[name] = out
 		}
 	}
+	log.Printf("[flux:diag] collected %d/%d non-nil node outputs -> returning to caller",
+		len(output), len(state.Nodes()))
 
 	return tool.Success(output), nil
 }
