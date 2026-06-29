@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"flux/runtime"
+	"github.com/tuxi/flux/runtime"
 )
 
 // echoInvoker 实现 Invoker 端口：对 "echo" 工具回显 input。

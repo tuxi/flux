@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"flux/skill"
+	"github.com/tuxi/flux/skill"
 )
 
 func writeSkill(t *testing.T, dir, content string) {

@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"flux/runtime"
-	"flux/runtime/mockprovider"
+	"github.com/tuxi/flux/runtime"
+	"github.com/tuxi/flux/runtime/mockprovider"
 )
 
 // echoInvoker 同 B-M1b，对 "echo" 回显。

@@ -4,12 +4,12 @@ import (
 	"context"
 	"testing"
 
-	"flux"
-	"flux/adapter/memory"
-	"flux/runtime"
-	"flux/store"
-	"flux/tool"
-	"flux/tool/builtin"
+	"github.com/tuxi/flux"
+	"github.com/tuxi/flux/adapter/memory"
+	"github.com/tuxi/flux/runtime"
+	"github.com/tuxi/flux/store"
+	"github.com/tuxi/flux/tool"
+	"github.com/tuxi/flux/tool/builtin"
 )
 
 // TestWorkflowTool_Integration 演示 Agent Runtime 如何调用 WorkflowTool。

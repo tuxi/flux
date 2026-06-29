@@ -17,11 +17,11 @@ import (
 	"testing"
 	"time"
 
-	"flux/model"
-	"flux/tool"
-	"flux/tool/builtin"
+	"github.com/tuxi/flux/model"
+	"github.com/tuxi/flux/tool"
+	"github.com/tuxi/flux/tool/builtin"
 
-	"flux/runtime"
+	"github.com/tuxi/flux/runtime"
 )
 
 func TestBDataflow_LLM_UsesReferences(t *testing.T) {

@@ -4,8 +4,8 @@ import (
 	"context"
 	"testing"
 
-	"flux/runtime"
-	"flux/store"
+	"github.com/tuxi/flux/runtime"
+	"github.com/tuxi/flux/store"
 )
 
 func TestWorkflowStore_CRUD(t *testing.T) {

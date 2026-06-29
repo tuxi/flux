@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"flux/tool/builtin"
+	"github.com/tuxi/flux/tool/builtin"
 )
 
 func TestGrepTool(t *testing.T) {

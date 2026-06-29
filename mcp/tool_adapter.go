@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 
-	"flux/tool"
+	"github.com/tuxi/flux/tool"
 )
 
 // ToolAdapter 把一个 MCP 工具包装成 flux/tool.Tool，使其能注册进 tool.Registry，

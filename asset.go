@@ -1,9 +1,9 @@
 package flux
 
 import (
-	"flux/definition"
-	"flux/skill"
-	"flux/tool"
+	"github.com/tuxi/flux/definition"
+	"github.com/tuxi/flux/skill"
+	"github.com/tuxi/flux/tool"
 )
 
 // Asset 是可以被 Engine 执行的能力单元。

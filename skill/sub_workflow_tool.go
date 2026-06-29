@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"flux/tool"
+	"github.com/tuxi/flux/tool"
 )
 
 // SubWorkflowTool 把 WorkflowSkill 包装成 tool.Tool。

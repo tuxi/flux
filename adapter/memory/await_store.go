@@ -4,7 +4,7 @@ import (
 	"context"
 	"sync"
 
-	"flux/store"
+	"github.com/tuxi/flux/store"
 )
 
 // AwaitStore 是 AwaitStore 的纯内存实现。用于测试。

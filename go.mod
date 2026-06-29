@@ -1,4 +1,4 @@
-module flux
+module github.com/tuxi/flux
 
 go 1.25.0
 

@@ -4,11 +4,11 @@ import (
 	"context"
 	"fmt"
 
-	"flux/model"
-	"flux/planner"
-	"flux/runtime"
-	"flux/store"
-	"flux/tool"
+	"github.com/tuxi/flux/model"
+	"github.com/tuxi/flux/planner"
+	"github.com/tuxi/flux/runtime"
+	"github.com/tuxi/flux/store"
+	"github.com/tuxi/flux/tool"
 )
 
 // WorkflowTool 将 Flux Workflow Engine 封装为一个 Tool，供任何 Agent Runtime 调用。

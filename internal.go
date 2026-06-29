@@ -4,9 +4,9 @@ import (
 	"context"
 	"fmt"
 
-	"flux/runtime"
-	"flux/store"
-	"flux/tool"
+	"github.com/tuxi/flux/runtime"
+	"github.com/tuxi/flux/store"
+	"github.com/tuxi/flux/tool"
 )
 
 // ── 内部适配器：把 Backend / Store 接口适配成 runtime 端口 ──

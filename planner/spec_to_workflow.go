@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strings"
 
-	"flux/definition"
+	"github.com/tuxi/flux/definition"
 )
 
 // SpecToWorkflow 将 DAGPlanner 生成的 planSpec 转换为 v1 engine 可执行的 WorkflowDefinition。

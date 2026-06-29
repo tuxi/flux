@@ -4,9 +4,9 @@ import (
 	"context"
 	"testing"
 
-	"flux/skill"
-	"flux/tool"
-	"flux/tool/builtin"
+	"github.com/tuxi/flux/skill"
+	"github.com/tuxi/flux/tool"
+	"github.com/tuxi/flux/tool/builtin"
 )
 
 func TestAsTool_ToolSkillIsDirectPassThrough(t *testing.T) {

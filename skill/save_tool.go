@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"flux/tool"
+	"github.com/tuxi/flux/tool"
 )
 
 // SaveAsSkillTool 是一个 tool.Tool——agent 在跑通一个动态 DAG 后调用它，

@@ -4,7 +4,7 @@ import (
 	"context"
 	"os/exec"
 
-	"flux/tool"
+	"github.com/tuxi/flux/tool"
 )
 
 // CompileTool 在工作目录运行 `go build ./...`。

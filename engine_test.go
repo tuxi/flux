@@ -5,9 +5,9 @@ import (
 	"sync"
 	"testing"
 
-	"flux"
-	"flux/definition"
-	"flux/tool"
+	"github.com/tuxi/flux"
+	"github.com/tuxi/flux/definition"
+	"github.com/tuxi/flux/tool"
 )
 
 // memBackend 是 Backend 的内存实现（测试用）。

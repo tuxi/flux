@@ -12,7 +12,7 @@ import (
 	"sort"
 	"testing"
 
-	"flux/runtime"
+	"github.com/tuxi/flux/runtime"
 )
 
 type recSink struct {

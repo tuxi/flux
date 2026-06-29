@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"flux/runtime"
-	"flux/runtime/mockprovider"
+	"github.com/tuxi/flux/runtime"
+	"github.com/tuxi/flux/runtime/mockprovider"
 )
 
 // TestBM2_FanoutAllSuccess 验证：N 个并行 async 任务全部成功 → join 收集结果。

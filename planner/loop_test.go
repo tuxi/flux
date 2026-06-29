@@ -14,9 +14,9 @@ import (
 	"path/filepath"
 	"testing"
 
-	"flux/runtime"
-	"flux/tool"
-	"flux/tool/builtin"
+	"github.com/tuxi/flux/runtime"
+	"github.com/tuxi/flux/tool"
+	"github.com/tuxi/flux/tool/builtin"
 )
 
 const badGo = "package main\n\nfunc main() {\n\tx := 1\n}\n"  // x 声明未使用 → 编译失败

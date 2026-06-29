@@ -10,7 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"flux/tool"
+	"github.com/tuxi/flux/tool"
 )
 
 // GrepTool 在工作目录用 `grep -rn` 按内容搜索文件（代码 agent 必备）

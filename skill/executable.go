@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 
-	"flux/tool"
+	"github.com/tuxi/flux/tool"
 )
 
 // ExecutableSkill 是 SkillSpec 解析后的"可执行体"。

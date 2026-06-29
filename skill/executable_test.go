@@ -7,9 +7,9 @@ import (
 	"os"
 	"testing"
 
-	"flux/skill"
-	"flux/tool"
-	"flux/tool/builtin"
+	"github.com/tuxi/flux/skill"
+	"github.com/tuxi/flux/tool"
+	"github.com/tuxi/flux/tool/builtin"
 )
 
 func testToolFactory(t *testing.T) skill.ToolFactory {

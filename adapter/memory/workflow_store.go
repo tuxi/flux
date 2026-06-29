@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"sync"
 
-	"flux/runtime"
-	"flux/store"
+	"github.com/tuxi/flux/runtime"
+	"github.com/tuxi/flux/store"
 )
 
 // WorkflowStore 是 WorkflowStore 的纯内存实现。用于测试。

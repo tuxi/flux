@@ -15,9 +15,9 @@ import (
 	"fmt"
 	"os"
 
-	"flux/mcp"
-	"flux/tool"
-	"flux/tool/builtin"
+	"github.com/tuxi/flux/mcp"
+	"github.com/tuxi/flux/tool"
+	"github.com/tuxi/flux/tool/builtin"
 )
 
 func main() {

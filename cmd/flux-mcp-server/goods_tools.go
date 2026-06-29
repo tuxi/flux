@@ -3,7 +3,7 @@ package main
 import (
 	"context"
 
-	"flux/tool"
+	"github.com/tuxi/flux/tool"
 )
 
 func registerGoodsTools(reg *tool.Registry) {

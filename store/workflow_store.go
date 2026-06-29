@@ -3,7 +3,7 @@ package store
 import (
 	"context"
 
-	"flux/runtime"
+	"github.com/tuxi/flux/runtime"
 )
 
 // WorkflowStore 是 Workflow Runtime 的核心持久化端口。

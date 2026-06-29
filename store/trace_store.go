@@ -3,7 +3,7 @@ package store
 import (
 	"context"
 
-	"flux/runtime"
+	"github.com/tuxi/flux/runtime"
 )
 
 // TraceStore 是 trace event log 的持久化端口。

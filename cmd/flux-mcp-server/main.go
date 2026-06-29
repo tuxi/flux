@@ -20,11 +20,11 @@ import (
 	"os"
 	"time"
 
-	"flux/model"
-	"flux/planner"
-	"flux/runtime"
-	"flux/tool"
-	"flux/tool/builtin"
+	"github.com/tuxi/flux/model"
+	"github.com/tuxi/flux/planner"
+	"github.com/tuxi/flux/runtime"
+	"github.com/tuxi/flux/tool"
+	"github.com/tuxi/flux/tool/builtin"
 )
 
 func main() {

@@ -14,8 +14,8 @@ import (
 	"testing"
 	"time"
 
-	"flux/mcp"
-	"flux/tool"
+	"github.com/tuxi/flux/mcp"
+	"github.com/tuxi/flux/tool"
 )
 
 func TestMCP_Adapter_RegistryRoundTrip(t *testing.T) {

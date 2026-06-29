@@ -4,11 +4,11 @@ import (
 	"context"
 	"testing"
 
-	"flux"
-	"flux/adapter/memory"
-	"flux/definition"
-	"flux/runtime"
-	"flux/store"
+	"github.com/tuxi/flux"
+	"github.com/tuxi/flux/adapter/memory"
+	"github.com/tuxi/flux/definition"
+	"github.com/tuxi/flux/runtime"
+	"github.com/tuxi/flux/store"
 )
 
 // ── Store 集成测试：v3 路径（WorkflowStore + AwaitStore + TraceStore）──

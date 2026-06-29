@@ -13,7 +13,7 @@ package store
 import (
 	"time"
 
-	"flux/runtime"
+	"github.com/tuxi/flux/runtime"
 )
 
 // RunMeta 是一次 Workflow 运行的元数据。

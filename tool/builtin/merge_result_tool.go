@@ -2,7 +2,7 @@ package builtin
 
 import (
 	"context"
-	"flux/tool"
+	"github.com/tuxi/flux/tool"
 )
 
 type MergeResultTool struct {

@@ -9,7 +9,7 @@ import (
 	"os"
 	"sync"
 
-	"flux/tool"
+	"github.com/tuxi/flux/tool"
 )
 
 const (

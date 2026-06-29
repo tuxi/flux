@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"flux/tool/builtin"
+	"github.com/tuxi/flux/tool/builtin"
 )
 
 const sample = "line one\nline two\nline three\nline four\nline five\n"

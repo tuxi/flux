@@ -9,9 +9,9 @@ import (
 	"fmt"
 	"testing"
 
-	"flux/runtime"
-	"flux/tool"
-	"flux/tool/builtin"
+	"github.com/tuxi/flux/runtime"
+	"github.com/tuxi/flux/tool"
+	"github.com/tuxi/flux/tool/builtin"
 )
 
 // ── 端口适配器（最小实现）─────────────────────────────────────────────

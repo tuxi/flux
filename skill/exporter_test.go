@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"flux/skill"
+	"github.com/tuxi/flux/skill"
 )
 
 func TestExportAndReload_RoundTrip(t *testing.T) {

@@ -7,10 +7,10 @@ import (
 	"testing"
 	"time"
 
-	"flux/mcp"
-	"flux/skill"
-	"flux/tool"
-	"flux/tool/builtin"
+	"github.com/tuxi/flux/mcp"
+	"github.com/tuxi/flux/skill"
+	"github.com/tuxi/flux/tool"
+	"github.com/tuxi/flux/tool/builtin"
 )
 
 func TestMCPServer_ExposesSkillsInToolsList(t *testing.T) {

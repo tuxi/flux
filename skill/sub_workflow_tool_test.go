@@ -4,8 +4,8 @@ import (
 	"context"
 	"testing"
 
-	"flux/skill"
-	"flux/tool"
+	"github.com/tuxi/flux/skill"
+	"github.com/tuxi/flux/tool"
 )
 
 func TestSubWorkflowTool_IsATool(t *testing.T) {

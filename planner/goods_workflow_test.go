@@ -6,10 +6,10 @@ import (
 	"testing"
 	"time"
 
-	"flux/planner"
-	"flux/runtime"
-	"flux/tool"
-	"flux/tool/builtin"
+	"github.com/tuxi/flux/planner"
+	"github.com/tuxi/flux/runtime"
+	"github.com/tuxi/flux/tool"
+	"github.com/tuxi/flux/tool/builtin"
 )
 
 // TestGoodsVideoDAG_DAGPlanner 验证 DAGPlanner 在拥有商品视频工具目录时，

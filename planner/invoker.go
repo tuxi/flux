@@ -9,8 +9,8 @@ import (
 	"context"
 	"fmt"
 
-	"flux/runtime"
-	"flux/tool"
+	"github.com/tuxi/flux/runtime"
+	"github.com/tuxi/flux/tool"
 )
 
 // ToolInvoker 把 tool.Registry 适配成 runtime.Invoker（Tool-First：节点 = 一次工具调用）。

@@ -10,7 +10,7 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	"flux/tool"
+	"github.com/tuxi/flux/tool"
 )
 
 // ReadFileTool 读取工作目录下的 UTF-8 文本文件。每行带行号前缀，支持 offset/limit 窗口读取。

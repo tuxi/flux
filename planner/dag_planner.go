@@ -24,10 +24,10 @@ import (
 	"fmt"
 	"strings"
 
-	"flux/definition"
-	"flux/model"
-	"flux/runtime"
-	"flux/tool"
+	"github.com/tuxi/flux/definition"
+	"github.com/tuxi/flux/model"
+	"github.com/tuxi/flux/runtime"
+	"github.com/tuxi/flux/tool"
 )
 
 type DAGPlanner struct {

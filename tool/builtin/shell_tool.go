@@ -7,7 +7,7 @@ import (
 	"os/exec"
 	"time"
 
-	"flux/tool"
+	"github.com/tuxi/flux/tool"
 )
 
 // ShellTool 在工作目录运行一条 shell 命令（sh -c），让代码 agent 能跑测试/构建/运行程序。

@@ -17,9 +17,9 @@ import (
 	"testing"
 	"time"
 
-	"flux/mcp"
-	"flux/tool"
-	"flux/tool/builtin"
+	"github.com/tuxi/flux/mcp"
+	"github.com/tuxi/flux/tool"
+	"github.com/tuxi/flux/tool/builtin"
 )
 
 // pipeTransport 把 mcp.Client 接到一个 in-process mcp.Server 上（同步实现，测试串行调用）。

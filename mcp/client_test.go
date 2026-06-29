@@ -17,7 +17,7 @@ import (
 	"testing"
 	"time"
 
-	"flux/mcp"
+	"github.com/tuxi/flux/mcp"
 )
 
 func requireE2E(t *testing.T) {

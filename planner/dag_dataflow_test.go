@@ -11,9 +11,9 @@ import (
 	"strings"
 	"testing"
 
-	"flux/runtime"
-	"flux/tool"
-	"flux/tool/builtin"
+	"github.com/tuxi/flux/runtime"
+	"github.com/tuxi/flux/tool"
+	"github.com/tuxi/flux/tool/builtin"
 )
 
 func mergeReg() *tool.Registry {

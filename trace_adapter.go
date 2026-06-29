@@ -3,8 +3,8 @@ package flux
 import (
 	"context"
 
-	"flux/runtime"
-	"flux/store"
+	"github.com/tuxi/flux/runtime"
+	"github.com/tuxi/flux/store"
 )
 
 // storeTraceSink 将 runtime.TraceSink 的事件实时桥接到 store.TraceStore。

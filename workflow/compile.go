@@ -13,8 +13,8 @@ import (
 
 	"github.com/expr-lang/expr"
 
-	"flux/definition"
-	"flux/runtime"
+	"github.com/tuxi/flux/definition"
+	"github.com/tuxi/flux/runtime"
 )
 
 // Compile 把 WorkflowDefinition 翻译为 runtime.Plan（依赖反转的关键一步）。

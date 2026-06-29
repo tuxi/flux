@@ -4,7 +4,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
-	"flux/utils"
+	"github.com/tuxi/flux/utils"
 	"sort"
 )
 

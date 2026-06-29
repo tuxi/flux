@@ -4,8 +4,8 @@ import (
 	"context"
 	"sync"
 
-	"flux/runtime"
-	"flux/store"
+	"github.com/tuxi/flux/runtime"
+	"github.com/tuxi/flux/store"
 )
 
 // TraceStore 是 TraceStore 的纯内存实现。用于测试。

@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"flux/tool/builtin"
+	"github.com/tuxi/flux/tool/builtin"
 )
 
 func TestShellTool(t *testing.T) {

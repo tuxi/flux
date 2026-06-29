@@ -6,8 +6,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"flux/skill"
-	"flux/tool"
+	"github.com/tuxi/flux/skill"
+	"github.com/tuxi/flux/tool"
 )
 
 func TestEvolutionLoop_SaveReloadAndUse(t *testing.T) {

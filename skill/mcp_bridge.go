@@ -3,7 +3,7 @@ package skill
 import (
 	"fmt"
 
-	"flux/tool"
+	"github.com/tuxi/flux/tool"
 )
 
 // RegisterAsTools 把 skill.Registry 里的所有 ExecutableSkill 转成 tool.Tool，

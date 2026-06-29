@@ -5,12 +5,12 @@ import (
 	"fmt"
 	"sync"
 
-	"flux/definition"
-	"flux/runtime"
-	"flux/skill"
-	"flux/store"
-	"flux/tool"
-	"flux/workflow"
+	"github.com/tuxi/flux/definition"
+	"github.com/tuxi/flux/runtime"
+	"github.com/tuxi/flux/skill"
+	"github.com/tuxi/flux/store"
+	"github.com/tuxi/flux/tool"
+	"github.com/tuxi/flux/workflow"
 )
 
 // Engine 是 Flux 执行内核的外部面。宿主创建一个 Engine，注册能力，然后只调 Run 和 Notify。

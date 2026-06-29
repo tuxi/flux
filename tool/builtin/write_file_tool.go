@@ -6,7 +6,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"flux/tool"
+	"github.com/tuxi/flux/tool"
 )
 
 // WriteFileTool 把内容写入工作目录下的文件。M1 用于让 planner 生成/修改代码。

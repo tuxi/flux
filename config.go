@@ -3,7 +3,7 @@ package flux
 import (
 	"context"
 
-	"flux/store"
+	"github.com/tuxi/flux/store"
 )
 
 // ── Config ────────────────────────────────────────────────────────────────────

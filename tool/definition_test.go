@@ -9,7 +9,7 @@ import (
 	"encoding/json"
 	"testing"
 
-	"flux/tool"
+	"github.com/tuxi/flux/tool"
 )
 
 // dataSchemaTool 只用 DataSchema 描述自己（代表本地工具）。
